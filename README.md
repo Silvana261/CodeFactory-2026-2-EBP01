@@ -1,4 +1,4 @@
-# CodeFactory-2026-2-EBP01
+# EBP01 - Motor de Pricing enfocado en Aereolíneas (CodeFactory-2026-2)
 
 # Integrantes:
 - Liseth Andrea Bedoya Cuervo
