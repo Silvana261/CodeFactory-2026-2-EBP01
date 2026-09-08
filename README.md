@@ -24,7 +24,15 @@
 ## Descripción del Proyecto
 Este proyecto consiste en el desarrollo de una aplicación web de gestión dinámica de precios que permita a los analistas de pricing y administradores centralizar, analizar y controlar la información necesaria para establecer precios de vuelos de manera más oportuna. La solución busca actuar principalmente sobre cuatro variables identificadas como estratégicas: datos, temporada, rutas y control, aprovechando su influencia para mejorar los resultados del proceso de pricing.
 
-A partir de esta información, la plataforma permitirá establecer precios para los vuelos de acuerdo con las condiciones asociadas a cada operación, considerando variables como la fecha actual, la fecha del vuelo, la cabina de viaje seleccionada y la disponibilidad de asientos. De esta manera, el precio podrá ajustarse de acuerdo con las condiciones que caracterizan cada vuelo y su contexto.
+A partir de esta información, la aplicación web permitirá establecer precios para los vuelos de acuerdo con las condiciones asociadas a cada operación, considerando variables como la fecha actual, la fecha del vuelo, la cabina de viaje seleccionada y la disponibilidad de asientos. De esta manera, el precio podrá ajustarse de acuerdo con las condiciones que caracterizan cada vuelo y su contexto.
+
+---
+## Objetivos del Proyecto
+- Implementar un mecanismo de cálculo dinámico de precios
+- Facilitar la creación y gestión de reglas de pricing
+- Registrar los cambios realizados sobre los precios
+- Proporcionar información para el análisis de las estrategias de pricing mediante reportes
+- Contribuir a la optimización de la rentabilidad de la aerolínea por medio de la adaptación de los precios
 
 ---
 
