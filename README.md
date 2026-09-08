@@ -15,7 +15,7 @@
 - Jesus Moises Montes Castellano
 - Franklyn Salazar Henao
 
-**Gestión de Proyectos:**
+**Equipo de Gestión de Proyectos:**
 - Juan Pablo Angulo Guzman
 - Esteban Correa Roldan
 
