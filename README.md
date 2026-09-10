@@ -7,7 +7,7 @@
 - Valentina Flórez Acosta
 - Silvana Saavedra Londoño
 - David Arango Sanchez
-- Juan Esteban Quintero Valencia
+- Juan Esteban Valencia Quintero
 
 **Equipo de Análisis y Diseño I:**
 - Ana Sofia Altamar Mina
