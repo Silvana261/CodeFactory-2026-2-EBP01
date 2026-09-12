@@ -1,6 +1,6 @@
 package com.aerodynamic.aerodynamic.pricing_engine.model.enums;
 
-public enum RuleCondition {
+public enum ConditionOperator {
 
     GREATER_THAN_OR_EQUAL(">="),
     LESS_THAN_OR_EQUAL("<="),
@@ -10,7 +10,7 @@ public enum RuleCondition {
     private final String symbol;
 
     // Enum constructor to associate each option with their corresponding symbol in text
-    RuleCondition(String symbol) {
+    ConditionOperator(String symbol) {
         this.symbol = symbol;
     }
 
