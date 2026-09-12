@@ -2,7 +2,7 @@ package com.aerodynamic.aerodynamic.pricing_engine.model;
 import jakarta.persistence.*;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.AdjustmentType;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.BussinessVariable;
-import com.aerodynamic.aerodynamic.pricing_engine.model.enums.RuleCondition;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.ConditionOperator;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
 
 
@@ -24,8 +24,11 @@ public class PricingRule {
     private BussinessVariable bussinessVariable;
 
     @Enumerated (EnumType.STRING)
-    @Column (name = "condition", nullable = false)
-    private RuleCondition condition;
+    @Column (name = "condition_operator", nullable = false)
+    private ConditionOperator conditionOperator;
+
+    @Column (name = "condition_value", nullable = false)
+    private Double conditionValue;
 
     @Enumerated (EnumType.STRING)
     @Column (name = "adjustment_type", nullable = false)
@@ -47,11 +50,11 @@ public class PricingRule {
     public PricingRule() {
     }
 
-    public PricingRule(Long idRule, String ruleName, BussinessVariable bussinessVariable, RuleCondition condition, AdjustmentType adjustmentType, Double adjustmentValue, StatusRule status, User creatorUser) {
+    public PricingRule(Long idRule, String ruleName, BussinessVariable bussinessVariable, ConditionOperator conditionOperator, AdjustmentType adjustmentType, Double adjustmentValue, StatusRule status, User creatorUser) {
         this.idRule = idRule;
         this.ruleName = ruleName;
         this.bussinessVariable = bussinessVariable;
-        this.condition = condition;
+        this.conditionOperator = conditionOperator;
         this.adjustmentType = adjustmentType;
         this.adjustmentValue = adjustmentValue;
         this.status = status;
@@ -84,12 +87,20 @@ public class PricingRule {
         this.bussinessVariable = bussinessVariable;
     }
 
-    public RuleCondition getCondition() {
-        return condition;
+    public ConditionOperator getCondition() {
+        return conditionOperator;
     }
 
-    public void setCondition(RuleCondition condition) {
-        this.condition = condition;
+    public void setCondition(ConditionOperator conditionOperator) {
+        this.conditionOperator = conditionOperator;
+    }
+
+    public Double getConditionValue() {
+        return conditionValue;
+    }
+
+    public void setConditionValue(Double conditionValue) {
+        this.conditionValue = conditionValue;
     }
 
     public AdjustmentType getAdjustmentType() {
