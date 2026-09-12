@@ -1,6 +1,9 @@
 package com.aerodynamic.aerodynamic.pricing_engine.model;
 import jakarta.persistence.*;
-import com.aerodynamic.aerodynamic.pricing_engine.model.User;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.AdjustmentType;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.BussinessVariable;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.RuleCondition;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
 
 
 @Entity
@@ -11,22 +14,29 @@ public class PricingRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column (name = "id_rule")
-    private long idRule;
+    private Long idRule;
 
+    @Column(name = "rule_name", nullable = false)
+    private String ruleName;
+
+    @Enumerated (EnumType.STRING)
     @Column(name = "bussiness_variable", nullable = false)
-    private String bussinessVariable;
+    private BussinessVariable bussinessVariable;
 
+    @Enumerated (EnumType.STRING)
     @Column (name = "condition", nullable = false)
-    private String condition;
+    private RuleCondition condition;
 
+    @Enumerated (EnumType.STRING)
     @Column (name = "adjustment_type", nullable = false)
-    private String adjustmentType;
+    private AdjustmentType adjustmentType;
 
     @Column (name = "adjustment_value", nullable = false)
     private Double adjustmentValue;
 
-    @Column (name = "status", nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private StatusRule status;
 
     @ManyToOne 
     @JoinColumn (name = "creator_user_id", nullable = false)
@@ -37,13 +47,15 @@ public class PricingRule {
     public PricingRule() {
     }
 
-    public PricingRule(long idRule, String bussinessVariable, String condition, String adjustmentType, Double adjustmentValue, String status) {
+    public PricingRule(Long idRule, String ruleName, BussinessVariable bussinessVariable, RuleCondition condition, AdjustmentType adjustmentType, Double adjustmentValue, StatusRule status, User creatorUser) {
         this.idRule = idRule;
+        this.ruleName = ruleName;
         this.bussinessVariable = bussinessVariable;
         this.condition = condition;
         this.adjustmentType = adjustmentType;
         this.adjustmentValue = adjustmentValue;
         this.status = status;
+        this.creatorUser = creatorUser;
     }
 
     // Getters and setters (Spring and Services need them to be able to access and modify private attributes)
@@ -56,27 +68,35 @@ public class PricingRule {
         this.idRule = idRule;
     }
 
-    public String getBussinessVariable() {
+    public String getRuleName() { 
+        return ruleName;
+    }
+
+    public void setRuleName(String ruleName) {
+        this.ruleName = ruleName;
+    }
+    
+    public BussinessVariable getBussinessVariable() {
         return bussinessVariable;
     }
 
-    public void setBussinessVariable(String bussinessVariable) {
+    public void setBussinessVariable(BussinessVariable bussinessVariable) {
         this.bussinessVariable = bussinessVariable;
     }
 
-    public String getCondition() {
+    public RuleCondition getCondition() {
         return condition;
     }
 
-    public void setCondition(String condition) {
+    public void setCondition(RuleCondition condition) {
         this.condition = condition;
     }
 
-    public String getAdjustmentType() {
+    public AdjustmentType getAdjustmentType() {
         return adjustmentType;
     }
 
-    public void setAdjustmentType(String adjustmentType) {
+    public void setAdjustmentType(AdjustmentType adjustmentType) {
         this.adjustmentType = adjustmentType;
     }
 
@@ -88,11 +108,19 @@ public class PricingRule {
         this.adjustmentValue = adjustmentValue;
     }
 
-    public String getStatus() {
+    public StatusRule getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(StatusRule status) {
         this.status = status;
+    }
+
+    public User getCreatorUser() {
+        return creatorUser;
+    }
+
+    public void setCreatorUser(User creatorUser) {
+        this.creatorUser = creatorUser;
     }
 }
