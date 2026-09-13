@@ -11,6 +11,7 @@ public class PricingRuleResponse {
     private String ruleName;
     private BussinessVariable bussinessVariable;
     private ConditionOperator conditionOperator;
+    private Double conditionValue;
     private AdjustmentType adjustmentType;
     private Double adjustmentValue;
     private StatusRule status;
@@ -21,11 +22,12 @@ public class PricingRuleResponse {
     }
 
     // useful for quick mapping
-    public PricingRuleResponse(Long idRule, String ruleName, BussinessVariable bussinessVariable, ConditionOperator conditionOperator, AdjustmentType adjustmentType, Double adjustmentValue, StatusRule status, Long creatorUserId) {
+    public PricingRuleResponse(Long idRule, String ruleName, BussinessVariable bussinessVariable, ConditionOperator conditionOperator, Double conditionValue, AdjustmentType adjustmentType, Double adjustmentValue, StatusRule status, Long creatorUserId) {
         this.idRule = idRule;
         this.ruleName = ruleName;
         this.bussinessVariable = bussinessVariable;
         this.conditionOperator = conditionOperator;
+        this.conditionValue = conditionValue;
         this.adjustmentType = adjustmentType;
         this.adjustmentValue = adjustmentValue;
         this.status = status;
@@ -35,10 +37,6 @@ public class PricingRuleResponse {
     // Getters and Setters
     public Long getIdRule() {
         return idRule;
-    }
-
-    public void setIdRule(Long idRule) {
-        this.idRule = idRule;
     }
 
     public String getRuleName() {
@@ -57,12 +55,20 @@ public class PricingRuleResponse {
         this.bussinessVariable = bussinessVariable;
     }
 
-    public ConditionOperator getCondition() {
+    public ConditionOperator getConditionOperator() {
         return conditionOperator;
     }
 
-    public void setCondition(ConditionOperator conditionOperator) {
+    public void setConditionOperator(ConditionOperator conditionOperator) {
         this.conditionOperator = conditionOperator;
+    }
+
+    public Double getConditionValue() {
+        return conditionValue;
+    }
+
+    public void setConditionValue(Double conditionValue) {
+        this.conditionValue = conditionValue;
     }
 
     public AdjustmentType getAdjustmentType() {
