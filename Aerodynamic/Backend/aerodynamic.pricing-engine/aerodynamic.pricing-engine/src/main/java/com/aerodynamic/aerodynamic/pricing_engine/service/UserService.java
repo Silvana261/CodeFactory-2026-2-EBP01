@@ -1,5 +1,7 @@
 package com.aerodynamic.aerodynamic.pricing_engine.service;
 
+import java.util.List;
+
 import com.aerodynamic.aerodynamic.pricing_engine.dto.RegisterUserRequest;
 import com.aerodynamic.aerodynamic.pricing_engine.dto.UserResponse;
 
@@ -16,4 +18,5 @@ public interface UserService {
      * @return a UserResponse containing the registered user's information
      */
     UserResponse registerUser(RegisterUserRequest request);
+    List<UserResponse> getAllUsers();
 }
