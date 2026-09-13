@@ -8,6 +8,10 @@ import com.aerodynamic.aerodynamic.pricing_engine.service.UserService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 
 @Service
@@ -38,6 +42,12 @@ public class UserServiceImpl implements UserService {
         user = userRepository.save(user);
 
         return toResponse(user);
+    }
+    @Override
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     private UserResponse toResponse(User user) {
