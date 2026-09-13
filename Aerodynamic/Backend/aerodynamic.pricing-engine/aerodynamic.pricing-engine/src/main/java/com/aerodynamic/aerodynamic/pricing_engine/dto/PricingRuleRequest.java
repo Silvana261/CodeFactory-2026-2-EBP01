@@ -3,6 +3,7 @@ package com.aerodynamic.aerodynamic.pricing_engine.dto;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.BussinessVariable;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.ConditionOperator;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.AdjustmentType;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -31,6 +32,12 @@ public class PricingRuleRequest {
     // Value of the price adjustment.
     @NotNull(message = "Adjustment value is required")
     private Double adjustmentValue;
+
+    @NotNull(message = "Status is required")
+    private StatusRule status;
+
+    @NotNull(message = "CreatorID is required")
+    private Long creatorUserId;
 
     // Empty constructor.
     public PricingRuleRequest() {
@@ -94,5 +101,17 @@ public class PricingRuleRequest {
     // Sets the adjustment value.
     public void setAdjustmentValue(Double adjustmentValue) {
         this.adjustmentValue = adjustmentValue;
+    }
+
+    public StatusRule getStatus() {
+        return status;
+    }
+
+    public void setStatus(StatusRule status) {
+        this.status = status;
+    }
+
+    public Long getCreatorUserId() {
+        return creatorUserId;
     }
 }

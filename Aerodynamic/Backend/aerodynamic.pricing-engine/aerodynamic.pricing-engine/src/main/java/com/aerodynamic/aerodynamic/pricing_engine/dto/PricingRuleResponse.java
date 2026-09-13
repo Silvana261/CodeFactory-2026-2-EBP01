@@ -39,10 +39,6 @@ public class PricingRuleResponse {
         return idRule;
     }
 
-    public void setIdRule(Long idRule) {
-        this.idRule = idRule;
-    }
-
     public String getRuleName() {
         return ruleName;
     }

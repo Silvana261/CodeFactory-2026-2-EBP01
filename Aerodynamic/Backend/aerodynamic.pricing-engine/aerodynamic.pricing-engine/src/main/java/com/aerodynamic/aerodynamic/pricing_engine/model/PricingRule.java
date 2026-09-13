@@ -67,10 +67,6 @@ public class PricingRule {
         return idRule;
     }
 
-    public void setIdRule(Long idRule) {
-        this.idRule = idRule;
-    }
-
     public String getRuleName() { 
         return ruleName;
     }
@@ -87,7 +83,7 @@ public class PricingRule {
         this.bussinessVariable = bussinessVariable;
     }
 
-    public ConditionOperator getCondition() {
+    public ConditionOperator getConditionOperator() {
         return conditionOperator;
     }
 
