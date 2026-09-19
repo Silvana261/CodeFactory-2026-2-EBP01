@@ -1021,9 +1021,6 @@ function UserCreated({ user, onBack }: { user: ManagedUser; onBack: () => void }
           </div>
         </div>
 
-        <Alert type="info">
-          Recuerda informar al usuario que debe cambiar su contraseña en el primer inicio de sesión.
-        </Alert>
 
         <div className="mt-5">
           <Btn onClick={onBack} className="w-full justify-center">
