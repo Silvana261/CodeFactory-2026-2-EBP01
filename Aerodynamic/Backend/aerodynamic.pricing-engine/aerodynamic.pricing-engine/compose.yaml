@@ -33,7 +33,8 @@ services:
 
   frontend:
     build:
-      context: ../../Frontend  # ← sube un nivel y entra a la carpeta del frontend
+      context: ../../../Frontend/AeroDynamic
+      dockerfile: ../Dockerfile
       args:
         VITE_API_URL: http://localhost:8080
     container_name: aerodynamic-frontend
