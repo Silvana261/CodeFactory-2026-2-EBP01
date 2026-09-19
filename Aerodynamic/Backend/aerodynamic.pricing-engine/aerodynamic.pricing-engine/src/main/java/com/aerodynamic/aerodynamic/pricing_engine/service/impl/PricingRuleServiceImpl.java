@@ -44,7 +44,7 @@ public class PricingRuleServiceImpl implements PricingRuleService {
         rule.setConditionValue(request.getConditionValue());
         rule.setAdjustmentType(request.getAdjustmentType());
         rule.setAdjustmentValue(request.getAdjustmentValue());
-        rule.setStatus(request.getStatus());
+        rule.setStatus(StatusRule.ACTIVE); // ← cambio aquí: antes request.getStatus()
         rule.setCreatorUser(creatorUser);
 
         // 3. Save to the database using the repository (ID will be generated automatically)
