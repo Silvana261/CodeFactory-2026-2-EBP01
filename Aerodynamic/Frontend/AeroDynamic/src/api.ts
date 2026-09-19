@@ -32,12 +32,15 @@ export interface PricingRuleRequest {
 }
 
 export interface PricingRuleResponse {
-  id: number
+  idRule: number
   ruleName: string
-  variable: string
-  condition: string
-  ajuste: string
-  activa: boolean
+  bussinessVariable: string
+  conditionOperator: string
+  conditionValue: number
+  adjustmentType: string
+  adjustmentValue: number
+  status: 'ACTIVE' | 'INACTIVE'
+  creatorUserId: number
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

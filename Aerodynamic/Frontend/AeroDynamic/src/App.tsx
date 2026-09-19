@@ -91,28 +91,22 @@ function mapBackendVariable(variable: string): PricingRule['variable'] {
 }
 
 function mapBackendRule(rule: PricingRuleResponse): PricingRule {
-  const condition = rule.condition || ''
-  const adjustment = rule.ajuste || ''
-  const conditionValue = condition.match(/-?\d+(?:\.\d+)?/)?.[0] || ''
-  const operatorMatch = condition.match(/>=|<=|>|<|GREATER_THAN_OR_EQUAL|LESS_THAN_OR_EQUAL|GREATER_THAN|LESS_THAN/)
   const operatorMap: Record<string, string> = {
     GREATER_THAN_OR_EQUAL: '≥',
     LESS_THAN_OR_EQUAL: '≤',
     GREATER_THAN: '>',
     LESS_THAN: '<',
   }
-  const rawOperator = operatorMatch?.[0] || ''
-  const adjustType = /DECREASE|DISMINUIR/i.test(adjustment) ? 'decrease' : 'increase'
 
   return {
-    id: String(rule.id),
+    id: String(rule.idRule),
     name: rule.ruleName,
-    variable: mapBackendVariable(rule.variable),
-    operator: operatorMap[rawOperator] || rawOperator,
-    conditionValue,
-    adjustType,
-    adjustValue: adjustment.match(/-?\d+(?:\.\d+)?/)?.[0] || '',
-    status: rule.activa ? 'active' : 'inactive',
+    variable: mapBackendVariable(rule.bussinessVariable),
+    operator: operatorMap[rule.conditionOperator] || rule.conditionOperator,
+    conditionValue: String(rule.conditionValue),
+    adjustType: rule.adjustmentType === 'DECREASE_VALUE' ? 'decrease' : 'increase',
+    adjustValue: String(rule.adjustmentValue),
+    status: rule.status === 'ACTIVE' ? 'active' : 'inactive',
   }
 }
 
