@@ -45,6 +45,21 @@ export interface PricingRuleResponse {
   creatorUserId: number
 }
 
+const HTTP_ERROR_MESSAGES: Record<number, string> = {
+  400: 'Los datos ingresados no son válidos.',
+  401: 'Correo electrónico o contraseña incorrectos.',
+  403: 'No tienes permisos para realizar esta acción.',
+  404: 'El recurso solicitado no existe.',
+  409: 'El recurso ya existe o hay un conflicto con los datos.',
+  500: 'Ocurrió un error en el servidor. Intenta más tarde.',
+}
+
+// Frases genéricas que Spring Boot devuelve por defecto y que NO queremos mostrar tal cual
+const GENERIC_REASON_PHRASES = new Set([
+  'unauthorized', 'bad request', 'forbidden', 'not found',
+  'internal server error', 'conflict',
+])
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -55,19 +70,28 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    let message = `Error ${response.status}`
+    let backendMessage = ''
     try {
       const responseText = await response.text()
       if (responseText) {
         try {
           const body = JSON.parse(responseText) as { message?: string; error?: string }
-          message = body.message || body.error || responseText
+          backendMessage = body.message || body.error || ''
         } catch {
-          message = responseText
+          backendMessage = responseText
         }
       }
     } catch {
+      // sin cuerpo legible
     }
+
+    const isGeneric =
+      !backendMessage || GENERIC_REASON_PHRASES.has(backendMessage.trim().toLowerCase())
+
+    const friendlyFallback = HTTP_ERROR_MESSAGES[response.status]
+      || 'No fue posible completar la solicitud. Intenta nuevamente.'
+
+    const message = isGeneric ? friendlyFallback : backendMessage
     throw new Error(message)
   }
 
