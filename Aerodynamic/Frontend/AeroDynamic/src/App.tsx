@@ -35,7 +35,7 @@ interface ManagedUser {
   email: string
   role: Role 
   status: 'active' | 'inactive'
-  createdAt: string
+  created_at: string
 }
 
 interface PricingRule {
@@ -782,12 +782,15 @@ function UsersList({ users, loading, error, onRegister }: {
                       {u.role === 'admin' ? 'Administrador' : 'Analista de Pricing'}
                     </span>
                   </td>
+                        <td className="px-5 py-4">
+                          <Badge status={u.status} />
+                        </td>
                   <td className="px-5 py-4">
                     <span
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       className="text-[#64748B] text-xs"
                     >
-                      {fmtDate(u.createdAt)}
+                      {fmtDate(u.created_at)}
                     </span>
                   </td>
                 </tr>
@@ -860,8 +863,8 @@ function RegisterUser({
           name: response.name,
           email: response.email,
           role: 'analyst',
-          status: 'active',
-          createdAt: new Date().toISOString().split('T')[0],
+          status: response.status === 'ACTIVE' ? 'active' : 'inactive',
+          created_at: response.created_at.split('T')[0],
         })
       })
       .catch((requestError: unknown) => {
@@ -1005,7 +1008,7 @@ function UserCreated({ user, onBack }: { user: ManagedUser; onBack: () => void }
                 ['Correo electrónico', user.email, true],
                 ['Rol asignado', 'Analista de Pricing', false],
                 ['Estado', 'Activo', false],
-                ['Fecha de registro', fmtDate(user.createdAt), true],
+                ['Fecha de registro', fmtDate(user.created_at), true],
               ] as const
             ).map(([label, val, mono]) => (
               <div key={label} className="flex justify-between items-baseline gap-4 text-sm">
@@ -1519,9 +1522,9 @@ export default function App() {
         id: String(user.id),
         name: user.name,
         email: user.email,
-        role: mapBackendRole(user.role), // ← antes: 'analyst' fijo
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
+        role: mapBackendRole(user.role),
+        status: user.status === 'ACTIVE' ? 'active' : 'inactive',
+        created_at: user.created_at.split('T')[0],
       })))
     })
     .catch((requestError: unknown) => {

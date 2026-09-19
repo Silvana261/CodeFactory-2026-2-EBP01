@@ -1,6 +1,9 @@
 package com.aerodynamic.aerodynamic.pricing_engine.model;
 
+import java.time.LocalDateTime;
+
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.Role;
+import com.aerodynamic.aerodynamic.pricing_engine.model.enums.UserStatus;
 import jakarta.persistence.*;
 
 @Entity
@@ -29,6 +32,15 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    // User's status (active/inactive)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserStatus status;
+
+    // Date and time when the user was created
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime created_at;
+
     // Empty constructor required by JPA
     public User() {
     }
@@ -39,6 +51,15 @@ public class User {
         this.email = email;
         this.password = password;
         this.role = role;
+    }
+
+    // Sets default values before the entity is first persisted
+    @PrePersist
+    protected void onCreate() {
+        this.created_at = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = UserStatus.ACTIVE;
+        }
     }
 
     // Gets the user's ID
@@ -89,5 +110,20 @@ public class User {
     // Sets the user's role
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    // Gets the user's status
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    // Sets the user's status
+    public void setStatus(UserStatus status) {
+        this.status = status;
+    }
+
+    // Gets the creation date
+    public LocalDateTime getCreated_at() {
+        return created_at;
     }
 }
