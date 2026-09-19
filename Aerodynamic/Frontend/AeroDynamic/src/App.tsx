@@ -1,4 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import {
+  createPricingRuleRequest,
+  getAllPricingRulesRequest,
+  getAllUsersRequest,
+  loginRequest,
+  registerUserRequest,
+  type BackendRole,
+  type PricingRuleResponse,
+} from './api'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -39,25 +48,6 @@ interface PricingRule {
   status: 'active' | 'inactive'
 }
 
-/* ─── Mock data ──────────────────────────────────────────────────────────── */
-
-const MOCK_CREDS: Array<{ email: string; password: string; name: string; role: Role }> = [
-  { email: 'admin@airpricing.com', password: 'Admin2024!', name: 'María González', role: 'admin' },
-  { email: 'analyst@airpricing.com', password: 'Analyst2024!', name: 'Carlos Rueda', role: 'analyst' },
-]
-
-const INITIAL_USERS: ManagedUser[] = [
-  { id: '1', name: 'Carlos Rueda', email: 'carlos.rueda@airpricing.com', role: 'analyst', status: 'active', createdAt: '2026-08-15' },
-  { id: '2', name: 'Laura Martínez', email: 'l.martinez@airpricing.com', role: 'analyst', status: 'active', createdAt: '2026-08-22' },
-  { id: '3', name: 'Diego Pérez', email: 'd.perez@airpricing.com', role: 'analyst', status: 'inactive', createdAt: '2026-09-01' },
-]
-
-const INITIAL_RULES: PricingRule[] = [
-  { id: '1', name: 'Alta demanda', variable: 'demand', operator: '≥', conditionValue: '80', adjustType: 'increase', adjustValue: '15', status: 'active' },
-  { id: '2', name: 'Baja disponibilidad', variable: 'availability', operator: '≤', conditionValue: '20', adjustType: 'increase', adjustValue: '20', status: 'active' },
-  { id: '3', name: 'Vuelo próximo', variable: 'temporal', operator: '≤', conditionValue: '7', adjustType: 'increase', adjustValue: '10', status: 'inactive' },
-]
-
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 const VAR_LABELS: Record<string, string> = {
@@ -81,8 +71,48 @@ const OPERATORS = [
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
-function uid() {
-  return Math.random().toString(36).slice(2, 9)
+function mapBackendRole(role: BackendRole): Role {
+  if (role === 'ADMIN') return 'admin'
+  if (role === 'PRICING_ANALYST') return 'analyst'
+  throw new Error(`Rol no soportado: ${role}`)
+}
+
+function mapBackendVariable(variable: string): PricingRule['variable'] {
+  const variables: Record<string, PricingRule['variable']> = {
+    DEMAND: 'demand',
+    AVAILABILITY: 'availability',
+    TEMPORAL_CONTEXT: 'temporal',
+    demand: 'demand',
+    availability: 'availability',
+    temporal: 'temporal',
+  }
+  return variables[variable] || 'demand'
+}
+
+function mapBackendRule(rule: PricingRuleResponse): PricingRule {
+  const condition = rule.condition || ''
+  const adjustment = rule.ajuste || ''
+  const conditionValue = condition.match(/-?\d+(?:\.\d+)?/)?.[0] || ''
+  const operatorMatch = condition.match(/>=|<=|>|<|GREATER_THAN_OR_EQUAL|LESS_THAN_OR_EQUAL|GREATER_THAN|LESS_THAN/)
+  const operatorMap: Record<string, string> = {
+    GREATER_THAN_OR_EQUAL: '≥',
+    LESS_THAN_OR_EQUAL: '≤',
+    GREATER_THAN: '>',
+    LESS_THAN: '<',
+  }
+  const rawOperator = operatorMatch?.[0] || ''
+  const adjustType = /DECREASE|DISMINUIR/i.test(adjustment) ? 'decrease' : 'increase'
+
+  return {
+    id: String(rule.id),
+    name: rule.ruleName,
+    variable: mapBackendVariable(rule.variable),
+    operator: operatorMap[rawOperator] || rawOperator,
+    conditionValue,
+    adjustType,
+    adjustValue: adjustment.match(/-?\d+(?:\.\d+)?/)?.[0] || '',
+    status: rule.activa ? 'active' : 'inactive',
+  }
 }
 
 function fmtDate(d: string) {
@@ -467,20 +497,23 @@ function LoginPage({ onLogin }: { onLogin: (u: SessionUser) => void }) {
     if (!isReady || loading) return
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const found = MOCK_CREDS.find(
-        (c) => c.email.toLowerCase() === email.trim().toLowerCase() && c.password === password,
-      )
-      if (found) {
-        const u: SessionUser = { name: found.name, email: found.email, role: found.role }
+    loginRequest({ email: email.trim(), password })
+      .then((response) => {
+        const u: SessionUser = {
+          name: response.name,
+          email: response.email,
+          role: mapBackendRole(response.role),
+        }
         setSuccessUser(u)
         setLoading(false)
-        setTimeout(() => onLogin(u), 1400)
-      } else {
+        onLogin(u)
+      })
+      .catch((requestError: unknown) => {
         setLoading(false)
-        setError('Correo electrónico o contraseña incorrectos. Verifica tus datos e intenta nuevamente.')
-      }
-    }, 1400)
+        setError(requestError instanceof Error
+          ? requestError.message
+          : 'No fue posible iniciar sesión. Verifica tus datos e intenta nuevamente.')
+      })
   }
 
   return (
@@ -656,38 +689,6 @@ function LoginPage({ onLogin }: { onLogin: (u: SessionUser) => void }) {
             </form>
           )}
 
-          {/* Demo hint */}
-          {!successUser && (
-            <div className="mt-8 p-4 bg-white rounded-lg border border-[#CBD5E1]">
-              <p
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest mb-2.5"
-              >
-                Credenciales de demostración
-              </p>
-              <div className="space-y-2">
-                {MOCK_CREDS.map((c) => (
-                  <button
-                    key={c.email}
-                    type="button"
-                    onClick={() => { setEmail(c.email); setPassword(c.password); setError('') }}
-                    className="w-full text-left p-2.5 rounded-md bg-[#F8FAFC] hover:bg-[#EEF2F7] border border-[#F1F5F9] hover:border-[#CBD5E1] transition-colors group"
-                  >
-                    <p className="text-xs font-semibold text-[#0D1B2A] group-hover:text-[#1A56DB] transition-colors">
-                      {c.role === 'admin' ? 'Administrador' : 'Analista de Pricing'}
-                    </p>
-                    <p
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      className="text-[10px] text-[#64748B] mt-0.5"
-                    >
-                      {c.email}
-                    </p>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-[#C7D0DA] mt-2.5 text-center">Haz clic para autocompletar</p>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -696,7 +697,12 @@ function LoginPage({ onLogin }: { onLogin: (u: SessionUser) => void }) {
 
 /* ─── Users List ─────────────────────────────────────────────────────────── */
 
-function UsersList({ users, onRegister }: { users: ManagedUser[]; onRegister: () => void }) {
+function UsersList({ users, loading, error, onRegister }: {
+  users: ManagedUser[]
+  loading: boolean
+  error: string
+  onRegister: () => void
+}) {
   return (
     <div>
       <div className="flex items-start justify-between mb-6">
@@ -726,6 +732,14 @@ function UsersList({ users, onRegister }: { users: ManagedUser[]; onRegister: ()
             Rol disponible: Analista de Pricing
           </span>
         </div>
+        {error && <div className="p-5"><Alert type="error">{error}</Alert></div>}
+        {loading && (
+          <div className="flex items-center justify-center gap-2 p-10 text-sm text-[#64748B]">
+            <div className="w-5 h-5 border-2 border-[#CBD5E1] border-t-[#1A56DB] rounded-full animate-spin" />
+            Cargando usuarios...
+          </div>
+        )}
+        {!loading && !error && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" role="table" aria-label="Lista de usuarios">
             <thead>
@@ -784,6 +798,7 @@ function UsersList({ users, onRegister }: { users: ManagedUser[]; onRegister: ()
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
@@ -835,17 +850,29 @@ function RegisterUser({
     setErrors({})
     setGeneralError('')
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      onSuccess({
-        id: uid(),
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role: 'analyst',
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
+    registerUserRequest({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      role: 'PRICING_ANALYST',
+    })
+      .then((response) => {
+        setLoading(false)
+        onSuccess({
+          id: String(response.id),
+          name: response.name,
+          email: response.email,
+          role: 'analyst',
+          status: 'active',
+          createdAt: new Date().toISOString().split('T')[0],
+        })
       })
-    }, 1500)
+      .catch((requestError: unknown) => {
+        setLoading(false)
+        setGeneralError(requestError instanceof Error
+          ? requestError.message
+          : 'No fue posible registrar el usuario.')
+      })
   }
 
   return (
@@ -1013,7 +1040,12 @@ function UserCreated({ user, onBack }: { user: ManagedUser; onBack: () => void }
 
 /* ─── Pricing Rules ──────────────────────────────────────────────────────── */
 
-function PricingRules({ rules, onCreate }: { rules: PricingRule[]; onCreate: () => void }) {
+function PricingRules({ rules, loading, error, onCreate }: {
+  rules: PricingRule[]
+  loading: boolean
+  error: string
+  onCreate: () => void
+}) {
   return (
     <div>
       <div className="flex items-start justify-between mb-6">
@@ -1043,6 +1075,14 @@ function PricingRules({ rules, onCreate }: { rules: PricingRule[]; onCreate: () 
             Variables: Demanda · Disponibilidad · Contexto temporal
           </span>
         </div>
+        {error && <div className="p-5"><Alert type="error">{error}</Alert></div>}
+        {loading && (
+          <div className="flex items-center justify-center gap-2 p-10 text-sm text-[#64748B]">
+            <div className="w-5 h-5 border-2 border-[#CBD5E1] border-t-[#1A56DB] rounded-full animate-spin" />
+            Cargando reglas...
+          </div>
+        )}
+        {!loading && !error && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" role="table" aria-label="Reglas de pricing">
             <thead>
@@ -1105,6 +1145,7 @@ function PricingRules({ rules, onCreate }: { rules: PricingRule[]; onCreate: () 
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
@@ -1163,19 +1204,40 @@ function CreateRule({
     setErrors({})
     setGeneralError('')
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      onSuccess({
-        id: uid(),
-        name: ruleName.trim(),
-        variable: variable as PricingRule['variable'],
-        operator,
-        conditionValue: condVal,
-        adjustType: adjustType as 'increase' | 'decrease',
-        adjustValue: adjustVal,
-        status: 'active',
+    const variableMap = {
+      demand: 'DEMAND',
+      availability: 'AVAILABILITY',
+      temporal: 'TEMPORAL_CONTEXT',
+    } as const
+    const operatorMap = {
+      '≥': 'GREATER_THAN_OR_EQUAL',
+      '≤': 'LESS_THAN_OR_EQUAL',
+      '>': 'GREATER_THAN',
+      '<': 'LESS_THAN',
+    } as const
+    const adjustmentMap = {
+      increase: 'INCREASE_VALUE',
+      decrease: 'DECREASE_VALUE',
+    } as const
+
+    createPricingRuleRequest({
+      ruleName: ruleName.trim(),
+      bussinessVariable: variableMap[variable as keyof typeof variableMap],
+      conditionOperator: operatorMap[operator as keyof typeof operatorMap],
+      conditionValue: Number(condVal),
+      adjustmentType: adjustmentMap[adjustType as keyof typeof adjustmentMap],
+      adjustmentValue: Number(adjustVal),
+    })
+      .then((response) => {
+        setLoading(false)
+        onSuccess(mapBackendRule(response))
       })
-    }, 1500)
+      .catch((requestError: unknown) => {
+        setLoading(false)
+        setGeneralError(requestError instanceof Error
+          ? requestError.message
+          : 'No fue posible crear la regla.')
+      })
   }
 
   return (
@@ -1442,10 +1504,47 @@ function RuleCreated({
 export default function App() {
   const [page, setPage] = useState<Page>('login')
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS)
-  const [rules, setRules] = useState<PricingRule[]>(INITIAL_RULES)
+  const [users, setUsers] = useState<ManagedUser[]>([])
+  const [rules, setRules] = useState<PricingRule[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState('')
+  const [rulesLoading, setRulesLoading] = useState(false)
+  const [rulesError, setRulesError] = useState('')
   const [newUser, setNewUser] = useState<ManagedUser | null>(null)
   const [newRule, setNewRule] = useState<PricingRule | null>(null)
+
+  useEffect(() => {
+    if (!currentUser || page !== 'users-list') return
+    setUsersLoading(true)
+    setUsersError('')
+    getAllUsersRequest()
+      .then((response) => {
+        setUsers(response.map((user) => ({
+          id: String(user.id),
+          name: user.name,
+          email: user.email,
+          role: 'analyst',
+          status: 'active',
+          createdAt: new Date().toISOString().split('T')[0],
+        })))
+      })
+      .catch((requestError: unknown) => {
+        setUsersError(requestError instanceof Error ? requestError.message : 'No fue posible cargar los usuarios.')
+      })
+      .finally(() => setUsersLoading(false))
+  }, [currentUser, page])
+
+  useEffect(() => {
+    if (!currentUser || page !== 'pricing-rules') return
+    setRulesLoading(true)
+    setRulesError('')
+    getAllPricingRulesRequest()
+      .then((response) => setRules(response.map(mapBackendRule)))
+      .catch((requestError: unknown) => {
+        setRulesError(requestError instanceof Error ? requestError.message : 'No fue posible cargar las reglas.')
+      })
+      .finally(() => setRulesLoading(false))
+  }, [currentUser, page])
 
   function handleLogin(u: SessionUser) {
     setCurrentUser(u)
@@ -1464,7 +1563,12 @@ export default function App() {
   return (
     <AppLayout user={currentUser} page={page} setPage={setPage} onLogout={handleLogout}>
       {page === 'users-list' && (
-        <UsersList users={users} onRegister={() => setPage('register-user')} />
+        <UsersList
+          users={users}
+          loading={usersLoading}
+          error={usersError}
+          onRegister={() => setPage('register-user')}
+        />
       )}
       {page === 'register-user' && (
         <RegisterUser
@@ -1481,7 +1585,12 @@ export default function App() {
         <UserCreated user={newUser} onBack={() => setPage('users-list')} />
       )}
       {page === 'pricing-rules' && (
-        <PricingRules rules={rules} onCreate={() => setPage('create-rule')} />
+        <PricingRules
+          rules={rules}
+          loading={rulesLoading}
+          error={rulesError}
+          onCreate={() => setPage('create-rule')}
+        />
       )}
       {page === 'create-rule' && (
         <CreateRule
