@@ -28,6 +28,7 @@ export interface PricingRuleRequest {
   conditionValue: number
   adjustmentType: 'INCREASE_VALUE' | 'DECREASE_VALUE'
   adjustmentValue: number
+  creatorUserId: number
 }
 
 export interface PricingRuleResponse {

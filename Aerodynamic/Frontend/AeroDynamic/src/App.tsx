@@ -23,6 +23,7 @@ type Page =
 type Role = 'admin' | 'analyst'
 
 interface SessionUser {
+  id: number
   name: string
   email: string
   role: Role
@@ -500,6 +501,7 @@ function LoginPage({ onLogin }: { onLogin: (u: SessionUser) => void }) {
     loginRequest({ email: email.trim(), password })
       .then((response) => {
         const u: SessionUser = {
+          id: response.id,
           name: response.name,
           email: response.email,
           role: mapBackendRole(response.role),
@@ -1155,11 +1157,12 @@ function PricingRules({ rules, loading, error, onCreate }: {
 /* ─── Create Rule ────────────────────────────────────────────────────────── */
 
 function CreateRule({
-  onCancel, onSuccess,
+  currentUser, onCancel, onSuccess,     // ← esta línea (desestructuración)
 }: {
+  currentUser: SessionUser              // ← esta línea (tipo)
   onCancel: () => void
   onSuccess: (r: PricingRule) => void
-}) {
+})  {
   const [ruleName, setRuleName] = useState('')
   const [variable, setVariable] = useState('')
   const [operator, setOperator] = useState('')
@@ -1228,6 +1231,7 @@ function CreateRule({
       conditionValue: Number(condVal),
       adjustmentType: adjustmentMap[adjustType as keyof typeof adjustmentMap],
       adjustmentValue: Number(adjustVal),
+      creatorUserId: currentUser.id,
     })
       .then((response) => {
         setLoading(false)
@@ -1595,6 +1599,7 @@ export default function App() {
       )}
       {page === 'create-rule' && (
         <CreateRule
+          currentUser = {currentUser}
           onCancel={() => setPage('pricing-rules')}
           onSuccess={(r) => {
             setRules((prev) => [...prev, r])
