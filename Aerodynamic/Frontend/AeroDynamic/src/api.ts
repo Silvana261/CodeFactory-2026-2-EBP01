@@ -12,6 +12,8 @@ export interface UserResponse {
   name: string
   email: string
   role: BackendRole
+  status: 'ACTIVE' | 'INACTIVE'
+  created_at: string
 }
 
 export interface RegisterUserRequest {

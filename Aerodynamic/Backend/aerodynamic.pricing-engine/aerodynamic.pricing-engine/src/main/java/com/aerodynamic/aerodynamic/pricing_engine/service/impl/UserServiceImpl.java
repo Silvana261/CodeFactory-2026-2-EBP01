@@ -56,7 +56,8 @@ public class UserServiceImpl implements UserService {
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
-
+        response.setStatus(user.getStatus());
+        response.setCreated_at(user.getCreated_at());
         return response;
     }
 }
