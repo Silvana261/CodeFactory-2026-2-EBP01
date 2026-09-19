@@ -32,7 +32,7 @@ interface ManagedUser {
   id: string
   name: string
   email: string
-  role: 'analyst'
+  role: Role 
   status: 'active' | 'inactive'
   createdAt: string
 }
@@ -778,12 +778,13 @@ function UsersList({ users, loading, error, onRegister }: {
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      Analista de Pricing
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border
+                      ${u.role === 'admin'
+                        ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+                    >
+                      {u.role === 'admin' ? 'Administrador' : 'Analista de Pricing'}
                     </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <Badge status={u.status} />
                   </td>
                   <td className="px-5 py-4">
                     <span
@@ -1518,21 +1519,21 @@ export default function App() {
     setUsersLoading(true)
     setUsersError('')
     getAllUsersRequest()
-      .then((response) => {
-        setUsers(response.map((user) => ({
-          id: String(user.id),
-          name: user.name,
-          email: user.email,
-          role: 'analyst',
-          status: 'active',
-          createdAt: new Date().toISOString().split('T')[0],
-        })))
-      })
-      .catch((requestError: unknown) => {
-        setUsersError(requestError instanceof Error ? requestError.message : 'No fue posible cargar los usuarios.')
-      })
-      .finally(() => setUsersLoading(false))
-  }, [currentUser, page])
+    .then((response) => {
+      setUsers(response.map((user) => ({
+        id: String(user.id),
+        name: user.name,
+        email: user.email,
+        role: mapBackendRole(user.role), // ← antes: 'analyst' fijo
+        status: 'active',
+        createdAt: new Date().toISOString().split('T')[0],
+      })))
+    })
+    .catch((requestError: unknown) => {
+      setUsersError(requestError instanceof Error ? requestError.message : 'No fue posible cargar los usuarios.')
+    })
+    .finally(() => setUsersLoading(false))
+}, [currentUser, page])
 
   useEffect(() => {
     if (!currentUser || page !== 'pricing-rules') return
