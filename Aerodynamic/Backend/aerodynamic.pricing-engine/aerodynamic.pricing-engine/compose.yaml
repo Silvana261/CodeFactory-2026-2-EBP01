@@ -10,6 +10,37 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pricing_engine"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .          # ← la carpeta actual (backend), donde vive el compose
+    container_name: aerodynamic-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/pricing_engine
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../../Frontend  # ← sube un nivel y entra a la carpeta del frontend
+      args:
+        VITE_API_URL: http://localhost:8080
+    container_name: aerodynamic-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
