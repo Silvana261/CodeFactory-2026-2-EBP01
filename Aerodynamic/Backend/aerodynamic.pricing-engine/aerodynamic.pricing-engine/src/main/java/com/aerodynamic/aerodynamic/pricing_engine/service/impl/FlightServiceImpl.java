@@ -52,6 +52,10 @@ public class FlightServiceImpl implements FlightService {
         return mapToResponse(savedFlight);
     }
 
+    /**
+     * Retrieves all registered flights to supply the pricing engine and frontend table.
+     * 
+     */
     @Override
     public List<FlightResponse> getAllFlights() {
         return flightRepository.findAll().stream()
@@ -59,6 +63,7 @@ public class FlightServiceImpl implements FlightService {
                 .collect(Collectors.toList());
     }
 
+    // Helper method to map Entity to Response DTO
     private FlightResponse mapToResponse(Flight flight) {
         return new FlightResponse(
                 flight.getIdFlight(),

@@ -32,8 +32,8 @@ public class FlightController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /**
-     * Endpoint to retrieve all registered flights.
+/**
+     * Endpoint GET to fetch all flights for the pricing table and dashboard.
      * URL: GET /api/flights
      */
     @GetMapping
