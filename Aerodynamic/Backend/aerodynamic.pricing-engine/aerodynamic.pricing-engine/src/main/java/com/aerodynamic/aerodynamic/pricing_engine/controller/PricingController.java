@@ -1,8 +1,10 @@
 package com.aerodynamic.aerodynamic.pricing_engine.controller;
 
+import com.aerodynamic.aerodynamic.pricing_engine.dto.FlightEvaluationResponse;
 import com.aerodynamic.aerodynamic.pricing_engine.dto.PricingRuleRequest;
 import com.aerodynamic.aerodynamic.pricing_engine.dto.PricingRuleResponse;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
+import com.aerodynamic.aerodynamic.pricing_engine.service.PricingEvaluationService;
 import com.aerodynamic.aerodynamic.pricing_engine.service.PricingRuleService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,14 +22,16 @@ import java.util.List;
 public class PricingController {
 
     private final PricingRuleService pricingRuleService;
+    private final PricingEvaluationService evaluationService;
 
     /**
      * Creates an instance of PricingController with the required pricing rule service.
-     *
+     * @param evaluationService service used to evaluate flight variables against pricing rules
      * @param pricingRuleService service used to handle pricing rule operations
      */
-    public PricingController(PricingRuleService pricingRuleService) {
+    public PricingController(PricingRuleService pricingRuleService, PricingEvaluationService evaluationService) {
         this.pricingRuleService = pricingRuleService;
+        this.evaluationService = evaluationService;
     }
 
     /**
@@ -69,5 +73,10 @@ public class PricingController {
 
         return ResponseEntity.ok(
                 pricingRuleService.getPricingRulesByStatus(status));
+    }
+
+    @GetMapping("/evaluate/{flightId}")
+    public ResponseEntity<FlightEvaluationResponse> evaluate(@PathVariable String flightId) {
+        return ResponseEntity.ok(evaluationService.evaluate(flightId));
     }
 }
