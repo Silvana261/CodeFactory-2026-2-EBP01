@@ -1,4 +1,4 @@
-package com.aerodynamic.aerodynamic.pricing_engine.service;
+package com.aerodynamic.aerodynamic.pricing_engine.service.impl;
 
 import com.aerodynamic.aerodynamic.pricing_engine.dto.AppliedAdjustment;
 import com.aerodynamic.aerodynamic.pricing_engine.dto.FlightEvaluationResponse;
@@ -8,6 +8,9 @@ import com.aerodynamic.aerodynamic.pricing_engine.model.PricingRule;
 import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
 import com.aerodynamic.aerodynamic.pricing_engine.repository.FlightRepository;
 import com.aerodynamic.aerodynamic.pricing_engine.repository.PricingRuleRepository;
+import com.aerodynamic.aerodynamic.pricing_engine.service.PricingEvaluationService;
+import com.aerodynamic.aerodynamic.pricing_engine.service.PriceCalculationService;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,7 +47,7 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
 
         // RF02: the evaluation tells us which rules apply to this flight.
         // ASSUMPTION: method name evaluateFlight(String) -> adjust to the real one in PricingEvaluationService.
-        FlightEvaluationResponse evaluation = pricingEvaluationService.evaluateFlight(flightId);
+        FlightEvaluationResponse evaluation = pricingEvaluationService.evaluate(flightId);
 
         // Only the ids come from the evaluation. Percentages and types are read from the stored rules (RNF01).
         // NOTE: if FlightEvaluationResponse ends up as a record, this getter becomes applicableRuleIds().
