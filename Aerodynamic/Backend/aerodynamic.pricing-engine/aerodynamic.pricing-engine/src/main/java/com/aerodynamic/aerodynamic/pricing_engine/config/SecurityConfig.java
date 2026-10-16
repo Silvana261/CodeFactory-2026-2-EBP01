@@ -1,6 +1,7 @@
 package com.aerodynamic.aerodynamic.pricing_engine.config;
 
 import com.aerodynamic.aerodynamic.pricing_engine.security.JwtAuthFilter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,7 +36,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthFilter jwtAuthFilter,
-                                                   CorsConfigurationSource corsSource) throws Exception {
+                                                   @Qualifier("corsConfigurationSource") CorsConfigurationSource corsSource) throws Exception {
         http
             // Disable CSRF since we are using stateless JWT authentication (no browser sessions)
             .csrf(csrf -> csrf.disable())
@@ -64,7 +65,7 @@ public class SecurityConfig {
     // Defines CORS configuration rules, reading allowed origins dynamically from application properties
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${cors.allowed-origins}") String[] allowedOrigins) {
+            @Value("${cors.allowed-origins:http://localhost:8443}") String[] allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigins)); // Set allowed domains/frontends
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")); // Allowed HTTP methods

@@ -50,26 +50,22 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
                     rule.getAdjustmentValue(), before.longValue(), current.longValue()));
         }
 
-        // Minimum fare is a floor, only relevant when adjustments were applied
-        boolean minimumFareApplied = false;
+        // Minimum fare is an internal floor: it is applied but never exposed to the client
         BigDecimal minimumFare = flight.getMinimumFare() == null ? null
                 : BigDecimal.valueOf(flight.getMinimumFare()).setScale(0, RoundingMode.HALF_UP);
         if (!adjustments.isEmpty() && minimumFare != null && current.compareTo(minimumFare) < 0) {
             current = minimumFare;
-            minimumFareApplied = true;
         }
 
         // RF06: with no applicable rules, `current` is still the base price
         boolean adjustmentsApplied = !adjustments.isEmpty();
         String message = adjustmentsApplied
                 ? adjustments.size() + " regla(s) de pricing aplicada(s)"
-                        + (minimumFareApplied ? "; se aplicó la tarifa mínima del vuelo" : "")
                 : "No se aplicaron ajustes; se conserva el precio base";
 
         return new PriceCalculationResponse(
                 flight.getIdFlight(), basePrice.longValue(), adjustments, current.longValue(),
-                minimumFare == null ? null : minimumFare.longValue(),
-                minimumFareApplied, adjustmentsApplied, message);
+                adjustmentsApplied, message);
     }
 
     private BigDecimal applyAdjustment(BigDecimal price, PricingRule rule) {

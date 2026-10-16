@@ -1,4 +1,35 @@
 import { useEffect, useState } from 'react'
+import {
+  ApiError,
+  createFlightRequest,
+  createPricingRuleRequest,
+  getAllFlightsRequest,
+  getAllPricingRulesRequest,
+  getAllUsersRequest,
+  getDynamicPriceRequest,
+  getFlightEvaluationRequest,
+  loginRequest,
+  registerUserRequest,
+  setUnauthorizedHandler,
+  type AdjustmentType,
+  type AppliedAdjustment,
+  type BackendRole,
+  type BusinessVariable,
+  type ConditionOperator,
+  type FlightEvaluationResponse,
+  type FlightResponse,
+  type PriceCalculationResponse,
+  type PricingRuleResponse,
+  type RuleEvaluationResult,
+  type RuleStatus,
+  type UserResponse,
+} from './api'
+import {
+  clearSession,
+  getSession,
+  saveSession,
+  type SessionUser,
+} from './session'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -23,19 +54,13 @@ type Page =
   | 'create-rule'
   | 'rule-created'
 
-type Role = 'admin' | 'analyst'
-
-interface SessionUser {
-  name: string
-  email: string
-  role: Role
-}
+type Role = SessionUser['role']
 
 interface ManagedUser {
   id: string
   name: string
   email: string
-  role: 'analyst'
+  role: Role
   status: 'active' | 'inactive'
   createdAt: string
 }
@@ -52,8 +77,7 @@ interface PricingRule {
 }
 
 interface PricingFlight {
-  id: string
-  code: string
+  idFlight: string
   origin: string
   destination: string
   departureAt: string
@@ -71,59 +95,6 @@ interface HelpTopic {
   keywords: string
 }
 
-/* ─── Mock data ──────────────────────────────────────────────────────────── */
-
-const MOCK_CREDS: Array<{ email: string; password: string; name: string; role: Role }> = [
-  { email: 'admin@airpricing.com', password: 'Admin2024!', name: 'María González', role: 'admin' },
-  { email: 'analyst@airpricing.com', password: 'Analyst2024!', name: 'Carlos Rueda', role: 'analyst' },
-]
-
-const INITIAL_USERS: ManagedUser[] = [
-  { id: '1', name: 'Carlos Rueda', email: 'carlos.rueda@airpricing.com', role: 'analyst', status: 'active', createdAt: '2026-08-15' },
-  { id: '2', name: 'Laura Martínez', email: 'l.martinez@airpricing.com', role: 'analyst', status: 'active', createdAt: '2026-08-22' },
-  { id: '3', name: 'Diego Pérez', email: 'd.perez@airpricing.com', role: 'analyst', status: 'inactive', createdAt: '2026-09-01' },
-]
-
-const INITIAL_RULES: PricingRule[] = [
-  { id: '1', name: 'Alta demanda', variable: 'demand', operator: '≥', conditionValue: '80', adjustType: 'increase', adjustValue: '15', status: 'active' },
-  { id: '2', name: 'Baja disponibilidad', variable: 'availability', operator: '≤', conditionValue: '20', adjustType: 'increase', adjustValue: '20', status: 'active' },
-  { id: '3', name: 'Vuelo próximo', variable: 'temporal', operator: '≤', conditionValue: '7', adjustType: 'increase', adjustValue: '10', status: 'inactive' },
-  { id: '4', name: 'Demanda baja', variable: 'demand', operator: '≤', conditionValue: '50', adjustType: 'decrease', adjustValue: '10', status: 'active' },
-]
-
-const INITIAL_FLIGHTS: PricingFlight[] = [
-  {
-    id: 'flight-1',
-    code: 'AD204',
-    origin: 'BOG',
-    destination: 'MDE',
-    departureAt: '2026-10-18T08:30',
-    basePrice: '285000',
-    capacity: '180',
-    availability: '64',
-  },
-  {
-    id: 'flight-2',
-    code: 'AD518',
-    origin: 'MDE',
-    destination: 'CTG',
-    departureAt: '2026-10-19T14:45',
-    basePrice: '340000',
-    capacity: '150',
-    availability: '27',
-  },
-  {
-    id: 'flight-3',
-    code: 'AD602',
-    origin: 'CLO',
-    destination: 'BAQ',
-    departureAt: '2026-10-24T16:20',
-    basePrice: '260000',
-    capacity: '144',
-    availability: '71',
-  },
-]
-
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 
 const VAR_LABELS: Record<string, string> = {
@@ -136,6 +107,76 @@ const VAR_UNITS: Record<string, string> = {
   demand: '%',
   availability: '%',
   temporal: ' días',
+}
+
+const ROLE_FROM_API: Record<BackendRole, Role> = {
+  ADMIN: 'admin',
+  PRICING_ANALYST: 'analyst',
+}
+
+const ROLE_LABELS: Record<Role, string> = {
+  admin: 'Administrador',
+  analyst: 'Analista de Pricing',
+}
+
+type UiOperator = '≥' | '≤' | '>' | '<'
+
+const VARIABLE_FROM_API: Record<BusinessVariable, PricingRule['variable']> = {
+  DEMAND: 'demand',
+  AVAILABILITY: 'availability',
+  TEMPORAL_CONTEXT: 'temporal',
+}
+
+const VARIABLE_TO_API: Record<PricingRule['variable'], BusinessVariable> = {
+  demand: 'DEMAND',
+  availability: 'AVAILABILITY',
+  temporal: 'TEMPORAL_CONTEXT',
+}
+
+const OPERATOR_FROM_API: Record<ConditionOperator, string> = {
+  GREATER_THAN_OR_EQUAL: '≥',
+  LESS_THAN_OR_EQUAL: '≤',
+  GREATER_THAN: '>',
+  LESS_THAN: '<',
+}
+
+const OPERATOR_TO_API: Record<UiOperator, ConditionOperator> = {
+  '≥': 'GREATER_THAN_OR_EQUAL',
+  '≤': 'LESS_THAN_OR_EQUAL',
+  '>': 'GREATER_THAN',
+  '<': 'LESS_THAN',
+}
+
+const ADJUSTMENT_FROM_API: Record<AdjustmentType, PricingRule['adjustType']> = {
+  INCREASE_VALUE: 'increase',
+  DECREASE_VALUE: 'decrease',
+}
+
+const ADJUSTMENT_TO_API: Record<PricingRule['adjustType'], AdjustmentType> = {
+  increase: 'INCREASE_VALUE',
+  decrease: 'DECREASE_VALUE',
+}
+
+const STATUS_FROM_API: Record<RuleStatus, PricingRule['status']> = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+}
+
+const USER_STATUS_FROM_API: Record<UserResponse['status'], ManagedUser['status']> = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+}
+
+function isUiVariable(value: string): value is PricingRule['variable'] {
+  return Object.prototype.hasOwnProperty.call(VARIABLE_TO_API, value)
+}
+
+function isUiOperator(value: string): value is UiOperator {
+  return Object.prototype.hasOwnProperty.call(OPERATOR_TO_API, value)
+}
+
+function isUiAdjustment(value: string): value is PricingRule['adjustType'] {
+  return Object.prototype.hasOwnProperty.call(ADJUSTMENT_TO_API, value)
 }
 
 const OPERATORS = [
@@ -280,9 +321,48 @@ function uid() {
 }
 
 function fmtDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('es-CO', {
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T12:00:00` : d)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('es-CO', {
     year: 'numeric', month: 'short', day: 'numeric',
   })
+}
+
+function toManagedUser(user: UserResponse): ManagedUser {
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    role: ROLE_FROM_API[user.role],
+    status: USER_STATUS_FROM_API[user.status],
+    createdAt: user.created_at,
+  }
+}
+
+function toPricingRule(rule: PricingRuleResponse): PricingRule {
+  const variable = VARIABLE_FROM_API[rule.bussinessVariable]
+  return {
+    id: String(rule.idRule),
+    name: rule.ruleName,
+    variable,
+    operator: OPERATOR_FROM_API[rule.conditionOperator],
+    conditionValue: String(rule.conditionValue),
+    adjustType: ADJUSTMENT_FROM_API[rule.adjustmentType],
+    adjustValue: String(rule.adjustmentValue),
+    status: STATUS_FROM_API[rule.status],
+  }
+}
+
+function toPricingFlight(flight: FlightResponse): PricingFlight {
+  return {
+    idFlight: flight.idFlight,
+    origin: flight.origin,
+    destination: flight.destination,
+    departureAt: flight.departureAt,
+    basePrice: String(flight.basePrice),
+    capacity: String(flight.capacity),
+    availability: String(flight.availability),
+  }
 }
 
 function fmtDateTime(value: string) {
@@ -313,31 +393,9 @@ function buildSummary(r: {
   return `Si la ${vl} es ${r.operator} ${r.conditionValue}${unit}, ${adj} el precio un ${r.adjustValue} %.`
 }
 
-function conditionMatches(value: number, operator: string, conditionValue: string) {
-  const threshold = Number(conditionValue)
-  if (operator === '≥') return value >= threshold
-  if (operator === '≤') return value <= threshold
-  if (operator === '>') return value > threshold
-  if (operator === '<') return value < threshold
-  return false
-}
-
-function getFlightVariableValues(flight: PricingFlight): Record<PricingRule['variable'], number> {
-  if (flight.code === 'AD204') return { demand: 85, availability: 15, temporal: 5 }
-  if (flight.code === 'AD518') return { demand: 42, availability: 48, temporal: 18 }
-  if (flight.code === 'AD602') return { demand: 65, availability: 35, temporal: 10 }
-
-  const capacity = Number(flight.capacity)
-  const available = Number(flight.availability)
-  return {
-    demand: 72,
-    availability: capacity > 0 ? Math.round((available / capacity) * 100) : 0,
-    temporal: 12,
-  }
-}
-
 const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passRx = /^(?=.*[A-Z])(?=.*\d).{8,}$/
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000
 
 /* ─── Shared UI atoms ────────────────────────────────────────────────────── */
 
@@ -527,10 +585,13 @@ function Alert({ type, children }: { type: 'error' | 'success' | 'info'; childre
   )
 }
 
-function Spinner({ size = 'sm' }: { size?: 'sm' | 'md' }) {
+function Spinner({ size = 'sm', tone = 'light' }: { size?: 'sm' | 'md'; tone?: 'light' | 'dark' }) {
   const s = size === 'sm' ? 'w-4 h-4 border-2' : 'w-6 h-6 border-2'
+  const color = tone === 'light'
+    ? 'border-white/30 border-t-white'
+    : 'border-[#1A56DB]/30 border-t-[#1A56DB]'
   return (
-    <div className={`${s} border-white/30 border-t-white rounded-full animate-spin`} aria-label="Cargando" />
+    <div className={`${s} ${color} rounded-full animate-spin`} aria-label="Cargando" />
   )
 }
 
@@ -754,25 +815,27 @@ function LoginPage({
 
   const isReady = email.trim() !== '' && password !== ''
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!isReady || loading) return
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const found = MOCK_CREDS.find(
-        (c) => c.email.toLowerCase() === email.trim().toLowerCase() && c.password === password,
-      )
-      if (found) {
-        const u: SessionUser = { name: found.name, email: found.email, role: found.role }
-        setSuccessUser(u)
-        setLoading(false)
-        setTimeout(() => onLogin(u), 1400)
-      } else {
-        setLoading(false)
-        setError('Correo electrónico o contraseña incorrectos. Verifica tus datos e intenta nuevamente.')
+    try {
+      const response = await loginRequest({ email: email.trim(), password })
+      const user: SessionUser = {
+        id: response.id,
+        name: response.name,
+        email: response.email,
+        role: ROLE_FROM_API[response.role],
       }
-    }, 1400)
+      saveSession(response.token, user)
+      setSuccessUser(user)
+      onLogin(user)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No fue posible iniciar sesión. Intenta nuevamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -949,39 +1012,7 @@ function LoginPage({
             </form>
           )}
 
-          {/* Demo hint */}
-          {!successUser && (
-            <div className="mt-8 p-4 bg-white rounded-lg border border-[#CBD5E1]">
-              <p
-                style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                className="text-[10px] font-bold text-[#94A3B8] uppercase tracking-widest mb-2.5"
-              >
-                Credenciales de demostración
-              </p>
-              <div className="space-y-2">
-                {MOCK_CREDS.map((c) => (
-                  <button
-                    key={c.email}
-                    type="button"
-                    onClick={() => { setEmail(c.email); setPassword(c.password); setError('') }}
-                    className="w-full text-left p-2.5 rounded-md bg-[#F8FAFC] hover:bg-[#EEF2F7] border border-[#F1F5F9] hover:border-[#CBD5E1] transition-colors group"
-                  >
-                    <p className="text-xs font-semibold text-[#0D1B2A] group-hover:text-[#1A56DB] transition-colors">
-                      {c.role === 'admin' ? 'Administrador' : 'Analista de Pricing'}
-                    </p>
-                    <p
-                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                      className="text-[10px] text-[#64748B] mt-0.5"
-                    >
-                      {c.email}
-                    </p>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-[#C7D0DA] mt-2.5 text-center">Haz clic para autocompletar</p>
-            </div>
-          )}
-          {!successUser && (
+          {import.meta.env.DEV && !successUser && (
             <button
               type="button"
               onClick={onProtectedAccess}
@@ -999,11 +1030,13 @@ function LoginPage({
 /* ─── Role dashboards / security states ─────────────────────────────────── */
 
 function RoleDashboard({
-  user, usersCount, rulesCount, onAuthorizedAccess, onRestrictedAccess, onExpire,
+  user, usersCount, rulesCount, loading, error, onAuthorizedAccess, onRestrictedAccess, onExpire,
 }: {
   user: SessionUser
-  usersCount: number
-  rulesCount: number
+  usersCount: number | null
+  rulesCount: number | null
+  loading: boolean
+  error: string
   onAuthorizedAccess: () => void
   onRestrictedAccess: () => void
   onExpire: () => void
@@ -1015,12 +1048,13 @@ function RoleDashboard({
     ? 'Registra y consulta los analistas con acceso a la plataforma.'
     : 'Consulta y define reglas, y registra vuelos para el motor de pricing dinámico.'
   const authorizedCount = isAdmin
-    ? `${usersCount} usuarios registrados`
-    : `${rulesCount} reglas definidas`
+    ? usersCount === null ? '— usuarios registrados' : `${usersCount} usuarios registrados`
+    : rulesCount === null ? '— reglas definidas' : `${rulesCount} reglas definidas`
   const restrictedName = isAdmin ? 'Registro de vuelos para pricing' : 'Gestión de usuarios'
 
   return (
     <div>
+      {error && <Alert type="error">{error}</Alert>}
       <div className="mb-7">
         <p
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
@@ -1055,7 +1089,7 @@ function RoleDashboard({
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                   className="text-xs text-[#94A3B8] mt-3"
                 >
-                  {authorizedCount}
+                  {loading ? <span className="inline-flex items-center gap-2"><Spinner tone="dark" /> Cargando...</span> : authorizedCount}
                 </p>
               </div>
             </div>
@@ -1081,13 +1115,13 @@ function RoleDashboard({
             <p className="text-[10px] text-[#64748B] uppercase tracking-widest">Rol actual</p>
             <p className="text-sm font-medium mt-1">{roleLabel}</p>
           </div>
-          <button
+          {import.meta.env.DEV && <button
             type="button"
             onClick={onExpire}
             className="w-full mt-4 pt-3 border-t border-white/10 text-left text-[11px] text-[#94A3B8] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00C2D4] rounded transition-colors"
           >
             Simular periodo de inactividad
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -1105,9 +1139,11 @@ function RoleDashboard({
             </p>
           </div>
         </div>
-        <Btn variant="secondary" onClick={onRestrictedAccess}>
-          Probar acceso restringido
-        </Btn>
+        {import.meta.env.DEV && (
+          <Btn variant="secondary" onClick={onRestrictedAccess}>
+            Probar acceso restringido
+          </Btn>
+        )}
       </div>
     </div>
   )
@@ -1424,9 +1460,13 @@ function HelpTopicDetails({ topic, onBack }: { topic: HelpTopic; onBack: () => v
 
 /* ─── Users List ─────────────────────────────────────────────────────────── */
 
-function UsersList({ users, onRegister }: { users: ManagedUser[]; onRegister: () => void }) {
+function UsersList({
+  users, loading, error, onRegister,
+}: { users: ManagedUser[]; loading: boolean; error: string; onRegister: () => void }) {
   return (
     <div>
+      {loading && <Alert type="info"><span className="inline-flex items-center gap-2"><Spinner tone="dark" /> Cargando usuarios...</span></Alert>}
+      {error && <Alert type="error">{error}</Alert>}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-[#0D1B2A]">Gestión de usuarios</h1>
@@ -1493,7 +1533,7 @@ function UsersList({ users, onRegister }: { users: ManagedUser[]; onRegister: ()
                   </td>
                   <td className="px-5 py-4">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      Analista de Pricing
+                    {ROLE_LABELS[u.role]}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -1556,24 +1596,33 @@ function RegisterUser({
     return e
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setErrors({})
     setGeneralError('')
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      onSuccess({
-        id: uid(),
+    try {
+      const response = await registerUserRequest({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        role: 'analyst',
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
+        password,
+        role: 'PRICING_ANALYST',
       })
-    }, 1500)
+      onSuccess(toManagedUser(response))
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setErrors((current) => ({
+          ...current,
+          email: 'Este correo electrónico ya se encuentra registrado en la plataforma.',
+        }))
+      } else {
+        setGeneralError(error instanceof Error ? error.message : 'No fue posible registrar el usuario.')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -1800,7 +1849,7 @@ function PricingFlights({
             <tbody>
               {flights.map((flight, index) => (
                 <tr
-                  key={flight.id}
+                  key={flight.idFlight}
                   className={`hover:bg-[#F8FAFC] transition-colors ${index < flights.length - 1 ? 'border-b border-[#F1F5F9]' : ''}`}
                 >
                   <td className="px-5 py-4">
@@ -1808,7 +1857,7 @@ function PricingFlights({
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       className="font-bold text-[#0D1B2A]"
                     >
-                      {flight.code}
+                      {flight.idFlight}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -1952,7 +2001,7 @@ function RegisterFlight({
     return nextErrors
   }
 
-  function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     const nextErrors = validate()
     if (Object.keys(nextErrors).length > 0) {
@@ -1962,19 +2011,22 @@ function RegisterFlight({
 
     setErrors({})
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      onSuccess({
-        id: uid(),
-        code: code.trim().toUpperCase(),
+    try {
+      const response = await createFlightRequest({
+        idFlight: code.trim().toUpperCase(),
         origin,
         destination,
         departureAt,
-        basePrice,
-        capacity,
-        availability,
+        basePrice: Number(basePrice),
+        capacity: Number(capacity),
+        availability: Number(availability),
       })
-    }, 1200)
+      onSuccess(toPricingFlight(response))
+    } catch (error: unknown) {
+      setErrors({ submit: error instanceof Error ? error.message : 'No fue posible registrar el vuelo.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -2135,7 +2187,7 @@ function FlightCreated({
   onBack: () => void
 }) {
   const details = [
-    ['Código de vuelo', flight.code],
+    ['Código de vuelo', flight.idFlight],
     ['Origen', AIRPORTS.find((airport) => airport.value === flight.origin)?.label || flight.origin],
     ['Destino', AIRPORTS.find((airport) => airport.value === flight.destination)?.label || flight.destination],
     ['Fecha y hora', fmtDateTime(flight.departureAt)],
@@ -2241,7 +2293,7 @@ function EvaluateVariablesList({
             <tbody>
               {flights.map((flight, index) => (
                 <tr
-                  key={flight.id}
+                  key={flight.idFlight}
                   className={`hover:bg-[#F8FAFC] transition-colors ${index < flights.length - 1 ? 'border-b border-[#F1F5F9]' : ''}`}
                 >
                   <td className="px-4 py-4">
@@ -2249,7 +2301,7 @@ function EvaluateVariablesList({
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       className="font-bold text-[#0D1B2A]"
                     >
-                      {flight.code}
+                      {flight.idFlight}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-[#334155]">{flight.origin}</td>
@@ -2301,49 +2353,56 @@ function FlightEvaluation({
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading')
 
-  const values = getFlightVariableValues(flight)
+  const [evaluation, setEvaluation] = useState<FlightEvaluationResponse | null>(null)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
+    let active = true
     setStatus('loading')
-    const timer = window.setTimeout(() => {
-      if (flight.code === 'AD518' && attempt === 0) {
-        setStatus('error')
-      } else {
-        setStatus('ready')
-      }
-    }, 1200)
-    return () => window.clearTimeout(timer)
-  }, [attempt, flight.code])
+    setErrorMessage('')
+    getFlightEvaluationRequest(flight.idFlight)
+      .then((response) => {
+        if (active) {
+          setEvaluation(response)
+          setStatus('ready')
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setStatus('error')
+          setErrorMessage(error instanceof Error ? error.message : 'No fue posible evaluar las variables del vuelo.')
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [attempt, flight.idFlight])
 
   const variables: Array<{
     key: PricingRule['variable']
     title: string
-    currentLabel: string
     icon: string
   }> = [
     {
       key: 'demand',
       title: 'Demanda',
-      currentLabel: `Demanda actual: ${values.demand}%`,
       icon: 'M3 17.25l5.25-5.25 3 3L18 8.25m0 0h-4.5m4.5 0v4.5',
     },
     {
       key: 'availability',
       title: 'Disponibilidad',
-      currentLabel: `Disponibilidad actual: ${values.availability}%`,
       icon: 'M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M5.25 4.5h13.5A1.5 1.5 0 0120.25 6v12a1.5 1.5 0 01-1.5 1.5H5.25A1.5 1.5 0 013.75 18V6a1.5 1.5 0 011.5-1.5z',
     },
     {
       key: 'temporal',
       title: 'Contexto temporal',
-      currentLabel: `Tiempo restante: ${values.temporal} días`,
       icon: 'M12 6v6l3.75 2.25M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
     },
   ]
 
-  const applicableRules = rules.filter(
-    (rule) => rule.status === 'active' && conditionMatches(values[rule.variable], rule.operator, rule.conditionValue),
-  )
+  const evaluationRows = evaluation?.evaluations ?? []
+  const applicableRules = evaluationRows.filter((rule) => rule.met && rule.ruleActive)
 
   if (status === 'loading') {
     return (
@@ -2352,7 +2411,7 @@ function FlightEvaluation({
           <div className="w-12 h-12 border-2 border-[#1A56DB]/20 border-t-[#1A56DB] rounded-full animate-spin mx-auto mb-5" />
           <h1 className="text-lg font-bold text-[#0D1B2A]">Evaluando variables de pricing…</h1>
           <p className="text-sm text-[#64748B] mt-2">
-            Estamos analizando las condiciones actuales del vuelo {flight.code}.
+            Estamos analizando las condiciones actuales del vuelo {flight.idFlight}.
           </p>
         </div>
       </div>
@@ -2371,7 +2430,7 @@ function FlightEvaluation({
           <p className="text-xs font-semibold text-[#DC2626] uppercase tracking-widest mb-2">Evaluación interrumpida</p>
           <h1 className="text-xl font-bold text-[#0D1B2A]">No fue posible evaluar las variables del vuelo</h1>
           <p className="text-sm text-[#64748B] leading-relaxed mt-2">
-            Ocurrió un problema al evaluar el vuelo {flight.code}. Intenta nuevamente.
+            {errorMessage || `Ocurrió un problema al evaluar el vuelo ${flight.idFlight}. Intenta nuevamente.`}
           </p>
           <div className="flex gap-3 mt-6">
             <Btn onClick={() => setAttempt((current) => current + 1)}>Intentar nuevamente</Btn>
@@ -2422,7 +2481,7 @@ function FlightEvaluation({
         </h2>
         <dl className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
-            ['Código', flight.code],
+            ['Código', flight.idFlight],
             ['Origen', flight.origin],
             ['Destino', flight.destination],
             ['Fecha y hora', fmtDateTime(flight.departureAt)],
@@ -2445,24 +2504,41 @@ function FlightEvaluation({
         <h2 id="variables-heading" className="text-sm font-bold text-[#0D1B2A] mb-3">
           Variables evaluadas
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {variables.map((variable) => {
-            const configuredRule = rules.find((rule) => rule.variable === variable.key)
-            const matched = configuredRule
-              ? conditionMatches(values[variable.key], configuredRule.operator, configuredRule.conditionValue)
-              : false
+        {evaluationRows.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {evaluationRows.map((rule) => {
+            const variableKey = VARIABLE_FROM_API[rule.variable]
+            const variable = variables.find((item) => item.key === variableKey)
+            const matched = rule.met
+            const actualValue = rule.actualValue
+            const currentLabel = actualValue === null || actualValue === undefined
+              ? rule.note || 'No fue posible obtener el valor evaluado.'
+              : variableKey === 'temporal'
+                ? `${actualValue.toFixed(1)}${VAR_UNITS[variableKey]}`
+                : `${actualValue.toFixed(actualValue % 1 === 0 ? 0 : 1)}%`
+            const operatorText = OPERATOR_FROM_API[rule.operator] ?? rule.operator
+            const expectedValue = rule.expectedValue
+            const conditionText = expectedValue === null || expectedValue === undefined
+              ? 'No fue posible cargar la condición.'
+              : `${operatorText} ${expectedValue}${VAR_UNITS[variableKey]}`
+            const statusLabel = rule.ruleActive ? null : 'Inactiva'
+            const cardStatusClass = matched
+              ? 'border-emerald-200 bg-emerald-50/30'
+              : 'border-rose-200 bg-rose-50/30'
+
             return (
-              <article key={variable.key} className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm">
+              <article key={rule.ruleId} className={`bg-white rounded-xl border ${cardStatusClass} p-5 shadow-sm`}>
                 <div className="w-9 h-9 rounded-lg bg-[#EEF2F7] text-[#1A56DB] flex items-center justify-center mb-4">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d={variable.icon} />
+                    <path strokeLinecap="round" strokeLinejoin="round" d={variable?.icon ?? ''} />
                   </svg>
                 </div>
-                <h3 className="text-sm font-bold text-[#0D1B2A]">{variable.title}</h3>
+                <h3 className="text-sm font-bold text-[#0D1B2A]">{variable?.title ?? rule.variable}</h3>
+                <p className="text-xs text-[#64748B] mt-1">{rule.ruleName}</p>
                 <dl className="space-y-3 mt-4">
                   <div>
                     <dt className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Valor actual</dt>
-                    <dd className="text-sm font-medium text-[#0D1B2A] mt-0.5">{variable.currentLabel}</dd>
+                    <dd className="text-sm font-medium text-[#0D1B2A] mt-0.5">{currentLabel}</dd>
                   </div>
                   <div>
                     <dt className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Condición configurada</dt>
@@ -2470,13 +2546,11 @@ function FlightEvaluation({
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       className="text-sm font-medium text-[#0D1B2A] mt-0.5"
                     >
-                      {configuredRule
-                        ? `${configuredRule.operator} ${configuredRule.conditionValue}${VAR_UNITS[variable.key]}`
-                        : 'Sin condición'}
+                      {conditionText}
                     </dd>
                   </div>
                 </dl>
-                <div className={`flex items-center gap-2 mt-4 pt-4 border-t border-[#F1F5F9] text-xs font-semibold ${matched ? 'text-emerald-700' : 'text-slate-600'}`}>
+                <div className={`flex items-center gap-2 mt-4 pt-4 border-t border-[#F1F5F9] text-xs font-semibold ${matched ? 'text-emerald-700' : 'text-rose-700'}`}>
                   <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 flex-shrink-0" aria-hidden="true">
                     {matched ? (
                       <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.051l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.816a.75.75 0 011.05-.143z" clipRule="evenodd" />
@@ -2486,13 +2560,20 @@ function FlightEvaluation({
                   </svg>
                   Resultado: {matched ? 'Condición cumplida' : 'Condición no cumplida'}
                 </div>
-                {configuredRule?.status === 'inactive' && (
-                  <p className="text-[10px] text-[#64748B] mt-2">La regla asociada está inactiva.</p>
+                {statusLabel && (
+                  <span className="inline-flex mt-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                    {statusLabel}
+                  </span>
                 )}
               </article>
             )
           })}
-        </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-[#CBD5E1] p-6 text-sm text-[#64748B]">
+            El backend no devolvió reglas para evaluar este vuelo.
+          </div>
+        )}
       </section>
 
       <section className="mt-6" aria-labelledby="applicable-rules-heading">
@@ -2508,28 +2589,37 @@ function FlightEvaluation({
 
         {applicableRules.length > 0 ? (
           <div className="space-y-3">
-            {applicableRules.map((rule) => (
-              <article key={rule.id} className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm flex items-center justify-between gap-5">
-                <div>
-                  <h3 className="text-sm font-bold text-[#0D1B2A]">{rule.name}</h3>
-                  <p className="text-xs text-[#64748B] mt-1">
-                    {VAR_LABELS[rule.variable]}{' '}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {rule.operator} {rule.conditionValue}{VAR_UNITS[rule.variable]}
-                    </span>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Ajuste</p>
-                  <p
-                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                    className={`text-sm font-bold mt-0.5 ${rule.adjustType === 'increase' ? 'text-red-700' : 'text-emerald-700'}`}
-                  >
-                    {rule.adjustType === 'increase' ? '+' : '−'}{rule.adjustValue}%
-                  </p>
-                </div>
-              </article>
-            ))}
+            {applicableRules.map((rule) => {
+              const variableKey = VARIABLE_FROM_API[rule.variable]
+              const operatorText = OPERATOR_FROM_API[rule.operator] ?? rule.operator
+              const adjustmentType = rule.adjustmentType === 'INCREASE_VALUE' ? 'increase' : 'decrease'
+              return (
+                <article key={rule.ruleId} className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm flex items-center justify-between gap-5">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0D1B2A]">{rule.ruleName}</h3>
+                    <p className="text-xs text-[#64748B] mt-1">
+                      {VAR_LABELS[variableKey]}{' '}
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        {rule.expectedValue === null
+                          ? 'No fue posible cargar la condición.'
+                          : `${operatorText} ${rule.expectedValue}${VAR_UNITS[variableKey]}`}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Ajuste</p>
+                    <p
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                      className={`text-sm font-bold mt-0.5 ${adjustmentType === 'increase' ? 'text-red-700' : 'text-emerald-700'}`}
+                    >
+                      {rule.adjustmentValue === null
+                        ? 'No disponible'
+                        : `${adjustmentType === 'increase' ? '+' : '−'}${rule.adjustmentValue}%`}
+                    </p>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-[#CBD5E1] p-7 shadow-sm text-center" role="status">
@@ -2600,7 +2690,7 @@ function CalculatePriceList({
             <tbody>
               {flights.map((flight, index) => (
                 <tr
-                  key={flight.id}
+                  key={flight.idFlight}
                   className={`hover:bg-[#F8FAFC] transition-colors ${index < flights.length - 1 ? 'border-b border-[#F1F5F9]' : ''}`}
                 >
                   <td className="px-4 py-4">
@@ -2608,7 +2698,7 @@ function CalculatePriceList({
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                       className="font-bold text-[#0D1B2A]"
                     >
-                      {flight.code}
+                      {flight.idFlight}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-[#334155]">{flight.origin}</td>
@@ -2658,32 +2748,38 @@ function DynamicPriceCalculation({
 }) {
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading')
-  const values = getFlightVariableValues(flight)
+  const [calculation, setCalculation] = useState<PriceCalculationResponse | null>(null)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
+    let active = true
     setStatus('loading')
-    const timer = window.setTimeout(() => {
-      if (flight.code === 'AD518' && attempt === 0) {
-        setStatus('error')
-      } else {
-        setStatus('ready')
-      }
-    }, 1200)
-    return () => window.clearTimeout(timer)
-  }, [attempt, flight.code])
+    setErrorMessage('')
+    getDynamicPriceRequest(flight.idFlight)
+      .then((response) => {
+        if (active) {
+          setCalculation(response)
+          setStatus('ready')
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setStatus('error')
+          setErrorMessage(error instanceof Error ? error.message : 'No fue posible calcular el precio dinámico.')
+        }
+      })
 
-  const appliedRules = rules.filter(
-    (rule) => rule.status === 'active' && conditionMatches(values[rule.variable], rule.operator, rule.conditionValue),
-  )
-  const excludedDisabledRules = rules.filter(
-    (rule) => rule.status === 'inactive' && conditionMatches(values[rule.variable], rule.operator, rule.conditionValue),
-  )
-  const totalAdjustment = appliedRules.reduce(
-    (total, rule) => total + (rule.adjustType === 'increase' ? Number(rule.adjustValue) : -Number(rule.adjustValue)),
-    0,
-  )
-  const basePrice = Number(flight.basePrice)
-  const dynamicPrice = Math.round(basePrice * (1 + totalAdjustment / 100))
+    return () => {
+      active = false
+    }
+  }, [attempt, flight.idFlight])
+
+  const basePrice = calculation?.basePrice ?? Number(flight.basePrice)
+  const dynamicPrice = calculation?.dynamicPrice ?? basePrice
+  const adjustments = calculation?.adjustments ?? []
+  const totalAdjustment = basePrice > 0 && calculation
+    ? ((dynamicPrice - basePrice) / basePrice) * 100
+    : 0
 
   if (status === 'loading') {
     return (
@@ -2692,7 +2788,7 @@ function DynamicPriceCalculation({
           <div className="w-12 h-12 border-2 border-[#1A56DB]/20 border-t-[#1A56DB] rounded-full animate-spin mx-auto mb-5" />
           <h1 className="text-lg font-bold text-[#0D1B2A]">Calculando precio dinámico…</h1>
           <p className="text-sm text-[#64748B] mt-2">
-            Estamos verificando las reglas activas para el vuelo {flight.code}.
+            Estamos verificando las reglas activas para el vuelo {flight.idFlight}.
           </p>
         </div>
       </div>
@@ -2711,7 +2807,7 @@ function DynamicPriceCalculation({
           <p className="text-xs font-semibold text-[#DC2626] uppercase tracking-widest mb-2">Cálculo interrumpido</p>
           <h1 className="text-xl font-bold text-[#0D1B2A]">No fue posible calcular el precio dinámico</h1>
           <p className="text-sm text-[#64748B] leading-relaxed mt-2">
-            No se completó el cálculo del vuelo {flight.code}. El precio base no fue modificado. Intenta nuevamente.
+            {errorMessage || `No se completó el cálculo del vuelo ${flight.idFlight}. El precio base no fue modificado. Intenta nuevamente.`}
           </p>
           <div className="flex gap-3 mt-6">
             <Btn onClick={() => setAttempt((current) => current + 1)}>Intentar nuevamente</Btn>
@@ -2744,7 +2840,7 @@ function DynamicPriceCalculation({
         </p>
         <h1 className="text-xl font-bold text-[#0D1B2A]">Cálculo del precio dinámico</h1>
         <p className="text-sm text-[#64748B] mt-1">
-          Trazabilidad del precio base y las reglas aplicadas al vuelo
+          {calculation?.message ?? 'Trazabilidad del precio base y las reglas aplicadas al vuelo'}
         </p>
       </div>
 
@@ -2754,7 +2850,7 @@ function DynamicPriceCalculation({
         </h2>
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            ['Código', flight.code],
+            ['Código', flight.idFlight],
             ['Origen', flight.origin],
             ['Destino', flight.destination],
             ['Fecha y hora', fmtDateTime(flight.departureAt)],
@@ -2782,47 +2878,48 @@ function DynamicPriceCalculation({
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
               className="text-[10px] text-[#94A3B8]"
             >
-              {appliedRules.length} {appliedRules.length === 1 ? 'regla activa' : 'reglas activas'}
+              {adjustments.length} {adjustments.length === 1 ? 'ajuste aplicado' : 'ajustes aplicados'}
             </span>
           </div>
+          <p className="text-xs text-[#64748B] mb-3">
+            Los ajustes se aplican sucesivamente: cada uno parte del precio resultante del anterior.
+          </p>
 
-          {appliedRules.length > 0 ? (
+          {adjustments.length > 0 ? (
             <div className="space-y-3">
-              {appliedRules.map((rule) => (
-                <article key={rule.id} className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-5">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-[#0D1B2A]">{rule.name}</h3>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3" aria-hidden="true">
-                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.051l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.816a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                          </svg>
-                          Regla activa y aplicable
-                        </span>
+              {adjustments.map((adjustment, index) => {
+                const direction = adjustment.adjustmentType === 'INCREASE_VALUE' ? 'increase' : 'decrease'
+                const adjustmentValue = adjustment.percentage
+                return (
+                  <article key={`${adjustment.ruleId}-${index}`} className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-[#0D1B2A]">{adjustment.ruleName}</h3>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3" aria-hidden="true">
+                              <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.051l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.816a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                            </svg>
+                            Ajuste aplicado
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#64748B] mt-1.5">
+                          {direction === 'increase' ? 'Aumento' : 'Disminución'}{' '}
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                            {direction === 'increase' ? '+' : '−'}{adjustmentValue}%
+                          </span>
+                        </p>
                       </div>
-                      <p className="text-xs text-[#64748B] mt-1.5">
-                        {VAR_LABELS[rule.variable]}{' '}
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          {rule.operator} {rule.conditionValue}{VAR_UNITS[rule.variable]}
-                        </span>
-                      </p>
+                      <div className="text-right">
+                        <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Precio</p>
+                        <p className="text-sm font-medium text-[#0D1B2A] mt-1">
+                          {fmtCurrency(String(adjustment.priceBefore))} → {fmtCurrency(String(adjustment.priceAfter))}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Ajuste</p>
-                      <p
-                        style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                        className={`text-lg font-bold mt-0.5 ${rule.adjustType === 'increase' ? 'text-red-700' : 'text-emerald-700'}`}
-                      >
-                        {rule.adjustType === 'increase' ? '+' : '−'}{rule.adjustValue}%
-                      </p>
-                      <p className="text-[10px] text-[#64748B]">
-                        {rule.adjustType === 'increase' ? 'Incremento' : 'Disminución'}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                )
+              })}
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-[#CBD5E1] p-7 shadow-sm text-center" role="status">
@@ -2832,25 +2929,14 @@ function DynamicPriceCalculation({
                 </svg>
               </div>
               <p className="text-sm font-semibold text-[#0D1B2A]">
-                No hay reglas aplicables para las condiciones actuales del vuelo.
+                No se aplicaron ajustes al precio base.
               </p>
               <p className="text-xs text-[#64748B] mt-1">
-                No se aplicó ningún ajuste al precio base.
+                El precio se mantiene igual al valor inicial de {flight.idFlight}.
               </p>
             </div>
           )}
 
-          {excludedDisabledRules.length > 0 && (
-            <div className="mt-3 px-4 py-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4 text-[#64748B] flex-shrink-0 mt-0.5" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-1.5a9 9 0 11-18 0 9 9 0 0118 0zM12 16.5h.008v.008H12V16.5z" />
-              </svg>
-              <p className="text-xs text-[#64748B] leading-relaxed">
-                {excludedDisabledRules.length} {excludedDisabledRules.length === 1 ? 'regla inactiva coincidió' : 'reglas inactivas coincidieron'} con las condiciones,
-                pero {excludedDisabledRules.length === 1 ? 'fue excluida' : 'fueron excluidas'} del cálculo.
-              </p>
-            </div>
-          )}
         </section>
 
         <aside className="space-y-4" aria-labelledby="dynamic-price-heading">
@@ -2862,7 +2948,7 @@ function DynamicPriceCalculation({
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
               className="text-2xl font-bold text-[#0D1B2A] mt-2"
             >
-              {fmtCurrency(flight.basePrice)}
+              {fmtCurrency(String(basePrice))}
             </p>
             <p className="text-xs text-[#64748B] mt-1">Punto de partida del cálculo</p>
           </div>
@@ -2875,7 +2961,7 @@ function DynamicPriceCalculation({
               style={{ fontFamily: "'JetBrains Mono', monospace" }}
               className="text-xl font-bold mt-2"
             >
-              {totalAdjustment > 0 ? '+' : totalAdjustment < 0 ? '−' : ''}{Math.abs(totalAdjustment)}%
+              {totalAdjustment > 0 ? '+' : totalAdjustment < 0 ? '−' : ''}{Math.abs(totalAdjustment).toFixed(2)}%
             </p>
             <div className="border-t border-white/10 mt-4 pt-4">
               <h2 id="dynamic-price-heading" className="text-xs text-[#94A3B8]">Precio dinámico</h2>
@@ -2887,7 +2973,7 @@ function DynamicPriceCalculation({
               </p>
             </div>
             <p className="text-[10px] text-[#64748B] mt-3 leading-relaxed">
-              Precio base {totalAdjustment === 0 ? 'sin ajustes' : `con un ajuste total de ${totalAdjustment > 0 ? '+' : '−'}${Math.abs(totalAdjustment)}%`}.
+              {calculation?.message || 'Cálculo basado en el resultado del backend.'}
             </p>
           </div>
         </aside>
@@ -2898,9 +2984,13 @@ function DynamicPriceCalculation({
 
 /* ─── Pricing Rules ──────────────────────────────────────────────────────── */
 
-function PricingRules({ rules, onCreate }: { rules: PricingRule[]; onCreate: () => void }) {
+function PricingRules({
+  rules, loading, error, onCreate,
+}: { rules: PricingRule[]; loading: boolean; error: string; onCreate: () => void }) {
   return (
     <div>
+      {loading && <Alert type="info"><span className="inline-flex items-center gap-2"><Spinner tone="dark" /> Cargando reglas...</span></Alert>}
+      {error && <Alert type="error">{error}</Alert>}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-[#0D1B2A]">Reglas de Pricing</h1>
@@ -2998,16 +3088,17 @@ function PricingRules({ rules, onCreate }: { rules: PricingRule[]; onCreate: () 
 /* ─── Create Rule ────────────────────────────────────────────────────────── */
 
 function CreateRule({
-  onCancel, onSuccess,
+  creatorUserId, onCancel, onSuccess,
 }: {
+  creatorUserId: number
   onCancel: () => void
   onSuccess: (r: PricingRule) => void
 }) {
   const [ruleName, setRuleName] = useState('')
-  const [variable, setVariable] = useState('')
-  const [operator, setOperator] = useState('')
+  const [variable, setVariable] = useState<PricingRule['variable'] | ''>('')
+  const [operator, setOperator] = useState<UiOperator | ''>('')
   const [condVal, setCondVal] = useState('')
-  const [adjustType, setAdjustType] = useState('')
+  const [adjustType, setAdjustType] = useState<PricingRule['adjustType'] | ''>('')
   const [adjustVal, setAdjustVal] = useState('')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -3041,26 +3132,32 @@ function CreateRule({
     return e
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0 || !variable || !operator || !adjustType) {
+      setErrors(errs)
+      return
+    }
     setErrors({})
     setGeneralError('')
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      onSuccess({
-        id: uid(),
-        name: ruleName.trim(),
-        variable: variable as PricingRule['variable'],
-        operator,
-        conditionValue: condVal,
-        adjustType: adjustType as 'increase' | 'decrease',
-        adjustValue: adjustVal,
-        status: 'active',
+    try {
+      const response = await createPricingRuleRequest({
+        ruleName: ruleName.trim(),
+        bussinessVariable: VARIABLE_TO_API[variable],
+        conditionOperator: OPERATOR_TO_API[operator],
+        conditionValue: Number(condVal),
+        adjustmentType: ADJUSTMENT_TO_API[adjustType],
+        adjustmentValue: Number(adjustVal),
+        creatorUserId,
       })
-    }, 1500)
+      onSuccess(toPricingRule(response))
+    } catch (error) {
+      setGeneralError(error instanceof Error ? error.message : 'No fue posible guardar la regla.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -3111,7 +3208,11 @@ function CreateRule({
             <Field label="Variable de negocio" required error={errors.variable}>
               <SelectInput
                 value={variable}
-                onChange={(v) => { setVariable(v); setOperator(''); clearErr('variable') }}
+                onChange={(v) => {
+                  setVariable(isUiVariable(v) ? v : '')
+                  setOperator('')
+                  clearErr('variable')
+                }}
                 placeholder="Selecciona una variable..."
                 options={[
                   { value: 'demand', label: 'Demanda' },
@@ -3127,7 +3228,10 @@ function CreateRule({
               <Field label="Operador / Condición" required error={errors.operator}>
                 <SelectInput
                   value={operator}
-                  onChange={(v) => { setOperator(v); clearErr('operator') }}
+                  onChange={(v) => {
+                      setOperator(isUiOperator(v) ? v : '')
+                      clearErr('operator')
+                    }}
                   placeholder="Selecciona..."
                   options={OPERATORS}
                   disabled={loading || !variable}
@@ -3172,7 +3276,10 @@ function CreateRule({
             <Field label="Tipo de ajuste" required error={errors.adjustType}>
               <SelectInput
                 value={adjustType}
-                onChange={(v) => { setAdjustType(v); clearErr('adjustType') }}
+                onChange={(v) => {
+                  setAdjustType(isUiAdjustment(v) ? v : '')
+                  clearErr('adjustType')
+                }}
                 placeholder="Selecciona..."
                 options={[
                   { value: 'increase', label: 'Aumentar precio' },
@@ -3325,15 +3432,26 @@ function RuleCreated({
 /* ─── Root ───────────────────────────────────────────────────────────────── */
 
 export default function App() {
-  const [page, setPage] = useState<Page>('login')
+  const [restoredSession] = useState(() => getSession())
+  const [page, setPage] = useState<Page>(() => restoredSession
+    ? restoredSession.user.role === 'admin' ? 'admin-dashboard' : 'analyst-dashboard'
+    : 'login')
   const [previousPage, setPreviousPage] = useState<Page>('login')
-  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(restoredSession?.user ?? null)
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false)
   const [loginNotice, setLoginNotice] = useState('')
   const [selectedHelpTopic, setSelectedHelpTopic] = useState<HelpTopic | null>(null)
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS)
-  const [rules, setRules] = useState<PricingRule[]>(INITIAL_RULES)
-  const [flights, setFlights] = useState<PricingFlight[]>(INITIAL_FLIGHTS)
+  const [users, setUsers] = useState<ManagedUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState('')
+  const [rules, setRules] = useState<PricingRule[]>([])
+  const [rulesLoading, setRulesLoading] = useState(false)
+  const [rulesError, setRulesError] = useState('')
+  const [usersCount, setUsersCount] = useState<number | null>(null)
+  const [rulesCount, setRulesCount] = useState<number | null>(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardError, setDashboardError] = useState('')
+  const [flights, setFlights] = useState<PricingFlight[]>([])
   const [newUser, setNewUser] = useState<ManagedUser | null>(null)
   const [newRule, setNewRule] = useState<PricingRule | null>(null)
   const [newFlight, setNewFlight] = useState<PricingFlight | null>(null)
@@ -3349,6 +3467,7 @@ export default function App() {
   }
 
   function handleLogout() {
+    clearSession()
     setShowLogoutConfirmation(false)
     setCurrentUser(null)
     setLoginNotice('La sesión se cerró correctamente. Debes autenticarte para volver a acceder.')
@@ -3356,10 +3475,107 @@ export default function App() {
   }
 
   function handleSessionExpired() {
+    clearSession()
     setShowLogoutConfirmation(false)
     setCurrentUser(null)
     setPage('session-expired')
   }
+
+  useEffect(() => {
+    setUnauthorizedHandler(handleSessionExpired)
+    return () => setUnauthorizedHandler(null)
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!currentUser) return
+
+    let timeoutId = 0
+    const expireIfIdle = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(handleSessionExpired, IDLE_TIMEOUT_MS)
+    }
+    const activityEvents: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll']
+    activityEvents.forEach((event) => window.addEventListener(event, expireIfIdle))
+    expireIfIdle()
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      activityEvents.forEach((event) => window.removeEventListener(event, expireIfIdle))
+    }
+  }, [currentUser])
+
+  useEffect(() => {
+    if (page !== 'users-list') return
+    let active = true
+    setUsersLoading(true)
+    setUsersError('')
+    getAllUsersRequest()
+      .then((response) => {
+        if (active) setUsers(response.map(toManagedUser))
+      })
+      .catch((error: unknown) => {
+        if (active) setUsersError(error instanceof Error ? error.message : 'No fue posible cargar los usuarios.')
+      })
+      .finally(() => {
+        if (active) setUsersLoading(false)
+      })
+    return () => { active = false }
+  }, [page])
+
+  useEffect(() => {
+    if (page !== 'pricing-rules') return
+    let active = true
+    setRulesLoading(true)
+    setRulesError('')
+    getAllPricingRulesRequest()
+      .then((response) => {
+        if (active) setRules(response.map(toPricingRule))
+      })
+      .catch((error: unknown) => {
+        if (active) setRulesError(error instanceof Error ? error.message : 'No fue posible cargar las reglas.')
+      })
+      .finally(() => {
+        if (active) setRulesLoading(false)
+      })
+    return () => { active = false }
+  }, [page])
+
+  useEffect(() => {
+    if (!['flights-list', 'evaluate-variables', 'calculate-price', 'register-flight'].includes(page)) return
+    let active = true
+    getAllFlightsRequest()
+      .then((response) => {
+        if (active) setFlights(response.map(toPricingFlight))
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          console.error(error)
+        }
+      })
+    return () => { active = false }
+  }, [page])
+
+  useEffect(() => {
+    if (page !== 'admin-dashboard' && page !== 'analyst-dashboard') return
+    let active = true
+    setDashboardLoading(true)
+    setDashboardError('')
+    const loadCount = page === 'admin-dashboard'
+      ? getAllUsersRequest().then((response) => {
+          if (active) setUsersCount(response.length)
+        })
+      : getAllPricingRulesRequest().then((response) => {
+          if (active) setRulesCount(response.length)
+        })
+    loadCount
+      .catch((error: unknown) => {
+        if (active) setDashboardError(error instanceof Error ? error.message : 'No fue posible cargar los datos del panel.')
+      })
+      .finally(() => {
+        if (active) setDashboardLoading(false)
+      })
+    return () => { active = false }
+  }, [page])
 
   function navigate(nextPage: Page) {
     setPreviousPage(page)
@@ -3433,8 +3649,10 @@ export default function App() {
           {page === 'admin-dashboard' && (
             <RoleDashboard
               user={currentUser}
-              usersCount={users.length}
-              rulesCount={rules.length}
+              usersCount={usersCount}
+              rulesCount={rulesCount}
+              loading={dashboardLoading}
+              error={dashboardError}
               onAuthorizedAccess={() => navigate('users-list')}
               onRestrictedAccess={() => navigate('register-flight')}
               onExpire={handleSessionExpired}
@@ -3443,8 +3661,10 @@ export default function App() {
           {page === 'analyst-dashboard' && (
             <RoleDashboard
               user={currentUser}
-              usersCount={users.length}
-              rulesCount={rules.length}
+              usersCount={usersCount}
+              rulesCount={rulesCount}
+              loading={dashboardLoading}
+              error={dashboardError}
               onAuthorizedAccess={() => navigate('pricing-rules')}
               onRestrictedAccess={() => navigate('users-list')}
               onExpire={handleSessionExpired}
@@ -3482,7 +3702,7 @@ export default function App() {
           )}
           {page === 'register-flight' && (
             <RegisterFlight
-              existingCodes={flights.map((flight) => flight.code)}
+              existingCodes={flights.map((flight) => flight.idFlight)}
               onCancel={() => navigate('flights-list')}
               onSuccess={(flight) => {
                 setFlights((current) => [...current, flight])
@@ -3534,7 +3754,12 @@ export default function App() {
             />
           )}
           {page === 'users-list' && (
-            <UsersList users={users} onRegister={() => navigate('register-user')} />
+            <UsersList
+              users={users}
+              loading={usersLoading}
+              error={usersError}
+              onRegister={() => navigate('register-user')}
+            />
           )}
           {page === 'register-user' && (
             <RegisterUser
@@ -3551,10 +3776,16 @@ export default function App() {
             <UserCreated user={newUser} onBack={() => setPage('users-list')} />
           )}
           {page === 'pricing-rules' && (
-            <PricingRules rules={rules} onCreate={() => setPage('create-rule')} />
+            <PricingRules
+              rules={rules}
+              loading={rulesLoading}
+              error={rulesError}
+              onCreate={() => setPage('create-rule')}
+            />
           )}
           {page === 'create-rule' && (
             <CreateRule
+              creatorUserId={currentUser.id}
               onCancel={() => setPage('pricing-rules')}
               onSuccess={(r) => {
                 setRules((prev) => [...prev, r])
