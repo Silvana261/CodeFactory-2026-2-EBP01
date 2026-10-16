@@ -1,7 +1,7 @@
 package com.aerodynamic.aerodynamic.pricing_engine.controller;
 
 import com.aerodynamic.aerodynamic.pricing_engine.dto.PriceCalculationResponse;
-import com.aerodynamic.aerodynamic.pricing_engine.service.PriceCalculationService;
+import com.aerodynamic.aerodynamic.pricing_engine.service.PricingMediator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/flights")
 public class PriceCalculationController {
 
-    private final PriceCalculationService priceCalculationService;
+    private final PricingMediator pricingMediator;
 
-    public PriceCalculationController(PriceCalculationService priceCalculationService) {
-        this.priceCalculationService = priceCalculationService;
+    public PriceCalculationController(PricingMediator pricingMediator) {
+        this.pricingMediator = pricingMediator;
     }
 
     /**
@@ -27,6 +27,6 @@ public class PriceCalculationController {
     @GetMapping("/{flightId}/dynamic-price")
     public ResponseEntity<PriceCalculationResponse> calculateDynamicPrice(
             @PathVariable String flightId) {
-        return ResponseEntity.ok(priceCalculationService.calculatePrice(flightId));
+        return ResponseEntity.ok(pricingMediator.calculatePrice(flightId));
     }
 }

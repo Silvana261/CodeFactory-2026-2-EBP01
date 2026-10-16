@@ -1,14 +1,9 @@
 package com.aerodynamic.aerodynamic.pricing_engine.service.impl;
 
 import com.aerodynamic.aerodynamic.pricing_engine.dto.AppliedAdjustment;
-import com.aerodynamic.aerodynamic.pricing_engine.dto.FlightEvaluationResponse;
 import com.aerodynamic.aerodynamic.pricing_engine.dto.PriceCalculationResponse;
 import com.aerodynamic.aerodynamic.pricing_engine.model.Flight;
 import com.aerodynamic.aerodynamic.pricing_engine.model.PricingRule;
-import com.aerodynamic.aerodynamic.pricing_engine.model.enums.StatusRule;
-import com.aerodynamic.aerodynamic.pricing_engine.repository.FlightRepository;
-import com.aerodynamic.aerodynamic.pricing_engine.repository.PricingRuleRepository;
-import com.aerodynamic.aerodynamic.pricing_engine.service.PricingEvaluationService;
 import com.aerodynamic.aerodynamic.pricing_engine.service.PriceCalculationService;
 
 import org.springframework.http.HttpStatus;
@@ -26,45 +21,11 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
-    private final FlightRepository flightRepository;
-    private final PricingRuleRepository pricingRuleRepository;
-    private final PricingEvaluationService pricingEvaluationService;
-
-    public PriceCalculationServiceImpl(FlightRepository flightRepository,
-                                       PricingRuleRepository pricingRuleRepository,
-                                       PricingEvaluationService pricingEvaluationService) {
-        this.flightRepository = flightRepository;
-        this.pricingRuleRepository = pricingRuleRepository;
-        this.pricingEvaluationService = pricingEvaluationService;
-    }
-
-    @Override
-    public PriceCalculationResponse calculatePrice(String flightId) {
-        // RF01: get the base price from the stored flight
-        Flight flight = flightRepository.findById(flightId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Flight not found: " + flightId));
-
-        // RF02: the evaluation tells us which rules apply to this flight.
-        // ASSUMPTION: method name evaluateFlight(String) -> adjust to the real one in PricingEvaluationService.
-        FlightEvaluationResponse evaluation = pricingEvaluationService.evaluate(flightId);
-
-        // Only the ids come from the evaluation. Percentages and types are read from the stored rules (RNF01).
-        // NOTE: if FlightEvaluationResponse ends up as a record, this getter becomes applicableRuleIds().
-        List<Long> ids = evaluation.getApplicableRuleIds() == null
-                ? List.of() : evaluation.getApplicableRuleIds();
-
-        List<PricingRule> rules = pricingRuleRepository.findAllById(ids).stream()
-                .filter(rule -> rule.getStatus() == StatusRule.ACTIVE) // only enabled rules (CA04)
-                .toList();
-
-        return calculate(flight, rules);
-    }
-
     /**
      * Pure calculation: uses only the flight's stored values and the given rules.
      * Never modifies the flight (RNF03).
      */
+    @Override
     public PriceCalculationResponse calculate(Flight flight, List<PricingRule> applicableRules) {
         if (flight.getBasePrice() == null || flight.getBasePrice() <= 0) {
             throw new ResponseStatusException(
