@@ -16,7 +16,7 @@ public class FlightServiceImpl implements FlightService {
 
     private final FlightRepository flightRepository;
 
-    // Fixed default minimum fare to protect airlines
+    // Fixed default minimum fare to protect airlines (internal, never exposed to the client)
     private static final double DEFAULT_MINIMUM_FARE = 80000.0;
 
     public FlightServiceImpl(FlightRepository flightRepository) {
@@ -54,7 +54,6 @@ public class FlightServiceImpl implements FlightService {
 
     /**
      * Retrieves all registered flights to supply the pricing engine and frontend table.
-     * 
      */
     @Override
     public List<FlightResponse> getAllFlights() {
@@ -63,7 +62,7 @@ public class FlightServiceImpl implements FlightService {
                 .collect(Collectors.toList());
     }
 
-    // Helper method to map Entity to Response DTO
+    // Helper method to map Entity to Response DTO (minimumFare is intentionally not exposed)
     private FlightResponse mapToResponse(Flight flight) {
         return new FlightResponse(
                 flight.getIdFlight(),
@@ -71,7 +70,6 @@ public class FlightServiceImpl implements FlightService {
                 flight.getDestination(),
                 flight.getDepartureAt(),
                 flight.getBasePrice(),
-                flight.getMinimumFare(),
                 flight.getCapacity(),
                 flight.getAvailability()
         );

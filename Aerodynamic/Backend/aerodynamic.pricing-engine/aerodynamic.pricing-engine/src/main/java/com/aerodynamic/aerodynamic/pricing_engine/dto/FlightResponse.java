@@ -9,17 +9,16 @@ public class FlightResponse {
     private City destination;
     private LocalDateTime departureAt;
     private Double basePrice;
-    private Double minimumFare;
     private Integer capacity;
     private Integer availability;
 
-    public FlightResponse(String idFlight, City origin, City destination, LocalDateTime departureAt, Double basePrice, Double minimumFare, Integer capacity, Integer availability) {
+    public FlightResponse(String idFlight, City origin, City destination, LocalDateTime departureAt,
+                          Double basePrice, Integer capacity, Integer availability) {
         this.idFlight = idFlight;
         this.origin = origin;
         this.destination = destination;
         this.departureAt = departureAt;
         this.basePrice = basePrice;
-        this.minimumFare = minimumFare;
         this.capacity = capacity;
         this.availability = availability;
     }
@@ -30,7 +29,6 @@ public class FlightResponse {
     public City getDestination() { return destination; }
     public LocalDateTime getDepartureAt() { return departureAt; }
     public Double getBasePrice() { return basePrice; }
-    public Double getMinimumFare() { return minimumFare; }
     public Integer getCapacity() { return capacity; }
     public Integer getAvailability() { return availability; }
 }
