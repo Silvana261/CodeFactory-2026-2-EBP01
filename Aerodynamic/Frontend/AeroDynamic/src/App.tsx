@@ -395,7 +395,7 @@ function buildSummary(r: {
 
 const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const passRx = /^(?=.*[A-Z])(?=.*\d).{8,}$/
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000
 
 /* ─── Shared UI atoms ────────────────────────────────────────────────────── */
 
@@ -1030,7 +1030,7 @@ function LoginPage({
 /* ─── Role dashboards / security states ─────────────────────────────────── */
 
 function RoleDashboard({
-  user, usersCount, rulesCount, loading, error, onAuthorizedAccess, onRestrictedAccess, onExpire,
+  user, usersCount, rulesCount, loading, error, onAuthorizedAccess, onRestrictedAccess,
 }: {
   user: SessionUser
   usersCount: number | null
@@ -1115,13 +1115,6 @@ function RoleDashboard({
             <p className="text-[10px] text-[#64748B] uppercase tracking-widest">Rol actual</p>
             <p className="text-sm font-medium mt-1">{roleLabel}</p>
           </div>
-          {import.meta.env.DEV && <button
-            type="button"
-            onClick={onExpire}
-            className="w-full mt-4 pt-3 border-t border-white/10 text-left text-[11px] text-[#94A3B8] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00C2D4] rounded transition-colors"
-          >
-            Simular periodo de inactividad
-          </button>}
         </div>
       </div>
 
@@ -2777,6 +2770,10 @@ function DynamicPriceCalculation({
   const basePrice = calculation?.basePrice ?? Number(flight.basePrice)
   const dynamicPrice = calculation?.dynamicPrice ?? basePrice
   const adjustments = calculation?.adjustments ?? []
+  const lastPrice = adjustments.length > 0
+  ? adjustments[adjustments.length - 1].priceAfter
+  : basePrice
+const hasInternalAdjustment = adjustments.length > 0 && lastPrice !== dynamicPrice
   const totalAdjustment = basePrice > 0 && calculation
     ? ((dynamicPrice - basePrice) / basePrice) * 100
     : 0
@@ -2920,6 +2917,22 @@ function DynamicPriceCalculation({
                   </article>
                 )
               })}
+              {hasInternalAdjustment && (
+              <article className="bg-white rounded-xl border border-[#CBD5E1] p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-5">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0D1B2A]">Ajuste por políticas internas</h3>
+                    <p className="text-xs text-[#64748B] mt-1.5">Aplicado automáticamente por el sistema</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider">Precio</p>
+                    <p className="text-sm font-medium text-[#0D1B2A] mt-1">
+                      {fmtCurrency(String(lastPrice))} → {fmtCurrency(String(dynamicPrice))}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            )}
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-[#CBD5E1] p-7 shadow-sm text-center" role="status">
@@ -2972,9 +2985,6 @@ function DynamicPriceCalculation({
                 {fmtCurrency(String(dynamicPrice))}
               </p>
             </div>
-            <p className="text-[10px] text-[#64748B] mt-3 leading-relaxed">
-              {calculation?.message || 'Cálculo basado en el resultado del backend.'}
-            </p>
           </div>
         </aside>
       </div>
@@ -3729,7 +3739,7 @@ export default function App() {
           )}
           {page === 'flight-evaluation' && evaluationFlight && (
             <FlightEvaluation
-              key={evaluationFlight.id}
+              key={evaluationFlight.idFlight}
               flight={evaluationFlight}
               rules={rules}
               onBack={() => navigate(evaluationReturnPage)}
@@ -3747,7 +3757,7 @@ export default function App() {
           )}
           {page === 'price-calculation' && calculationFlight && (
             <DynamicPriceCalculation
-              key={calculationFlight.id}
+              key={calculationFlight.idFlight}
               flight={calculationFlight}
               rules={rules}
               onBack={() => navigate(calculationReturnPage)}
