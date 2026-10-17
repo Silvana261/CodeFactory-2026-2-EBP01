@@ -1,3 +1,5 @@
+import { clearSession, getSession } from './session'
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 export type BackendRole = 'ADMIN' | 'PRICING_ANALYST'
@@ -5,6 +7,14 @@ export type BackendRole = 'ADMIN' | 'PRICING_ANALYST'
 export interface LoginRequest {
   email: string
   password: string
+}
+
+export interface LoginResponse {
+  token: string
+  id: number
+  name: string
+  email: string
+  role: BackendRole
 }
 
 export interface UserResponse {
@@ -23,12 +33,21 @@ export interface RegisterUserRequest {
   role: BackendRole
 }
 
+export type BusinessVariable = 'DEMAND' | 'AVAILABILITY' | 'TEMPORAL_CONTEXT'
+export type ConditionOperator =
+  | 'GREATER_THAN_OR_EQUAL'
+  | 'LESS_THAN_OR_EQUAL'
+  | 'GREATER_THAN'
+  | 'LESS_THAN'
+export type AdjustmentType = 'INCREASE_VALUE' | 'DECREASE_VALUE'
+export type RuleStatus = 'ACTIVE' | 'INACTIVE'
+
 export interface PricingRuleRequest {
   ruleName: string
-  bussinessVariable: 'DEMAND' | 'AVAILABILITY' | 'TEMPORAL_CONTEXT'
-  conditionOperator: 'GREATER_THAN_OR_EQUAL' | 'LESS_THAN_OR_EQUAL' | 'GREATER_THAN' | 'LESS_THAN'
+  bussinessVariable: BusinessVariable
+  conditionOperator: ConditionOperator
   conditionValue: number
-  adjustmentType: 'INCREASE_VALUE' | 'DECREASE_VALUE'
+  adjustmentType: AdjustmentType
   adjustmentValue: number
   creatorUserId: number
 }
@@ -36,13 +55,79 @@ export interface PricingRuleRequest {
 export interface PricingRuleResponse {
   idRule: number
   ruleName: string
-  bussinessVariable: string
-  conditionOperator: string
+  bussinessVariable: BusinessVariable
+  conditionOperator: ConditionOperator
   conditionValue: number
-  adjustmentType: string
+  adjustmentType: AdjustmentType
   adjustmentValue: number
-  status: 'ACTIVE' | 'INACTIVE'
+  status: RuleStatus
   creatorUserId: number
+}
+
+export interface FlightRequest {
+  idFlight: string
+  origin: string
+  destination: string
+  departureAt: string
+  basePrice: number
+  capacity: number
+  availability: number
+}
+
+export interface FlightResponse {
+  idFlight: string
+  origin: string
+  destination: string
+  departureAt: string
+  basePrice: number
+  capacity: number
+  availability: number
+}
+
+export interface RuleEvaluationResult {
+  ruleId: number
+  ruleName: string
+  variable: BusinessVariable
+  actualValue: number | null
+  operator: ConditionOperator
+  expectedValue: number | null
+  met: boolean
+  ruleActive: boolean
+  adjustmentType: AdjustmentType | null
+  adjustmentValue: number | null
+  note: string | null
+}
+
+export interface FlightEvaluationResponse {
+  flightId: string
+  evaluations: RuleEvaluationResult[]
+  applicableRuleIds: number[]
+  message: string
+}
+
+export interface AppliedAdjustment {
+  ruleId: number
+  ruleName: string
+  adjustmentType: string
+  percentage: number
+  priceBefore: number
+  priceAfter: number
+}
+
+export interface PriceCalculationResponse {
+  flightId: string
+  basePrice: number
+  adjustments: AppliedAdjustment[]
+  dynamicPrice: number
+  adjustmentsApplied: boolean
+  message: string
+}
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
 const HTTP_ERROR_MESSAGES: Record<number, string> = {
@@ -60,29 +145,48 @@ const GENERIC_REASON_PHRASES = new Set([
   'internal server error', 'conflict',
 ])
 
+type UnauthorizedHandler = () => void
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  const token = getSession()?.token
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.headers || {}),
-    },
+    headers,
   })
 
   if (!response.ok) {
     let backendMessage = ''
-    try {
-      const responseText = await response.text()
-      if (responseText) {
-        try {
-          const body = JSON.parse(responseText) as { message?: string; error?: string }
-          backendMessage = body.message || body.error || ''
-        } catch {
-          backendMessage = responseText
-        }
+    const responseText = await response.text()
+    if (responseText) {
+      try {
+        const body = JSON.parse(responseText) as { message?: string; error?: string }
+        backendMessage = body.message || body.error || ''
+      } catch {
+        backendMessage = responseText
       }
-    } catch {
-      // sin cuerpo legible
+    }
+
+    if (response.status === 401 && path !== '/api/auth/login') {
+      clearSession()
+      unauthorizedHandler?.()
+      throw new ApiError('La sesión ha vencido. Inicia sesión nuevamente.', response.status)
+    }
+
+    if (response.status === 401 && path === '/api/auth/login') {
+      throw new ApiError(HTTP_ERROR_MESSAGES[401], response.status)
+    }
+
+    if (response.status === 403) {
+      throw new ApiError('No tienes permisos para realizar esta acción.', response.status)
     }
 
     const isGeneric =
@@ -92,14 +196,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       || 'No fue posible completar la solicitud. Intenta nuevamente.'
 
     const message = isGeneric ? friendlyFallback : backendMessage
-    throw new Error(message)
+    throw new ApiError(message, response.status)
   }
 
   return response.json() as Promise<T>
 }
 
-export function loginRequest(payload: LoginRequest): Promise<UserResponse> {
-  return request<UserResponse>('/api/auth/login', {
+export function loginRequest(payload: LoginRequest): Promise<LoginResponse> {
+  return request<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -129,4 +233,23 @@ export function getAllPricingRulesRequest(): Promise<PricingRuleResponse[]> {
 
 export function getPricingRulesByStatusRequest(status: 'ACTIVE' | 'INACTIVE'): Promise<PricingRuleResponse[]> {
   return request<PricingRuleResponse[]>(`/api/pricing-rules/status/${status}`)
+}
+
+export function createFlightRequest(payload: FlightRequest): Promise<FlightResponse> {
+  return request<FlightResponse>('/api/flights', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getAllFlightsRequest(): Promise<FlightResponse[]> {
+  return request<FlightResponse[]>('/api/flights')
+}
+
+export function getFlightEvaluationRequest(flightId: string): Promise<FlightEvaluationResponse> {
+  return request<FlightEvaluationResponse>(`/api/pricing-rules/evaluate/${flightId}`)
+}
+
+export function getDynamicPriceRequest(flightId: string): Promise<PriceCalculationResponse> {
+  return request<PriceCalculationResponse>(`/api/flights/${flightId}/dynamic-price`)
 }
