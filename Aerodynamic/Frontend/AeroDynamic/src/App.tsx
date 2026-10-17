@@ -896,8 +896,8 @@ function LoginPage({
           <div className="flex gap-8">
             {([
               ['3 variables', 'Motor dinámico'],
-              ['2 activas', 'Reglas configuradas'],
-              ['3 usuarios', 'Acceso autorizado'],
+              ['2 roles', 'Administrador y Analista'],
+              ['Acceso', 'Solo usuarios autorizados'],
             ] as const).map(([val, label]) => (
               <div key={label}>
                 <p
@@ -1692,7 +1692,7 @@ function RegisterUser({
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Analista de Pricing
             </span>
-            <span className="text-xs text-[#94A3B8]">Único rol disponible en Sprint 1</span>
+            <span className="text-xs text-[#94A3B8]">Único rol disponible</span>
           </div>
         </Field>
 
