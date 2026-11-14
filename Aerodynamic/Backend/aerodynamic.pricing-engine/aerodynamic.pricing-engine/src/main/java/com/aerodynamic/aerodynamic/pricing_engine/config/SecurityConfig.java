@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/pricing-rules/**").hasRole("PRICING_ANALYST")
                 .requestMatchers("/api/flights/**").hasRole("PRICING_ANALYST")
+                .requestMatchers("/api/price-changes/**").hasRole("PRICING_ANALYST")
                 .anyRequest().authenticated())
             // Insert our custom JWT filter before the standard username/password authentication filter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
