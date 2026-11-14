@@ -7,12 +7,13 @@ import org.hibernate.annotations.Immutable;
 import java.util.UUID;
 
 /**
- * Snapshot of a rule applied in a price change (RF-04).
+ * Snapshot of a rule applied in a price change.
  * Values are copied (not just a FK) so later edits/deletes of the rule do not alter history.
  */
 @Entity
 @Immutable
-@Table(name = "price_change_rules")
+@Table(name = "price_change_rules",
+       indexes = @Index(name = "idx_price_change_rule_change", columnList = "price_change_id"))
 public class PriceChangeRule {
 
     @Id
@@ -31,6 +32,10 @@ public class PriceChangeRule {
 
     @Column(updatable = false)
     private String ruleName;
+
+    // Business variable (demand, availability, temporal context...). Null in records created before this field existed.
+    @Column(updatable = false)
+    private String businessVariable;
 
     @Column(updatable = false)
     private String adjustmentType;
@@ -51,6 +56,7 @@ public class PriceChangeRule {
         this.applicationOrder = applicationOrder;
         this.ruleId = a.getRuleId();
         this.ruleName = a.getRuleName();
+        this.businessVariable = a.getBusinessVariable();
         this.adjustmentType = a.getAdjustmentType();
         this.percentage = a.getPercentage();
         this.priceBefore = a.getPriceBefore();
@@ -61,6 +67,7 @@ public class PriceChangeRule {
     public Integer getApplicationOrder() { return applicationOrder; }
     public Long getRuleId() { return ruleId; }
     public String getRuleName() { return ruleName; }
+    public String getBusinessVariable() { return businessVariable; }
     public String getAdjustmentType() { return adjustmentType; }
     public Double getPercentage() { return percentage; }
     public Long getPriceBefore() { return priceBefore; }
