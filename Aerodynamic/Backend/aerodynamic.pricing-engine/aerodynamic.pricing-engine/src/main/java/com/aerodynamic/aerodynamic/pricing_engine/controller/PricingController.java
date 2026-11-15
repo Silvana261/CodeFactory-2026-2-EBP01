@@ -79,4 +79,33 @@ public class PricingController {
     public ResponseEntity<FlightEvaluationResponse> evaluate(@PathVariable String flightId) {
         return ResponseEntity.ok(evaluationService.evaluate(flightId));
     }
+
+    /**
+     * Updates an existing pricing rule by its ID.
+     *
+     * @param id     the ID of the pricing rule to update
+     * @param request object containing the updated pricing rule information
+     * @return a ResponseEntity containing the updated pricing rule
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<PricingRuleResponse> updatePricingRule(
+            @PathVariable Long id,
+            @Valid @RequestBody PricingRuleRequest request) {
+
+        return ResponseEntity.ok(
+                pricingRuleService.updatePricingRule(id, request));
+    }
+
+    /**
+     * Updates the status (ACTIVE or INACTIVE) of an existing pricing rule.
+     * URL: PATCH /api/pricing-rules/{id}/status?status=ACTIVE
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<PricingRuleResponse> updateRuleStatus(
+            @PathVariable Long id,
+            @RequestParam StatusRule status) {
+
+        return ResponseEntity.ok(
+                pricingRuleService.updateRuleStatus(id, status));
+    }
 }
