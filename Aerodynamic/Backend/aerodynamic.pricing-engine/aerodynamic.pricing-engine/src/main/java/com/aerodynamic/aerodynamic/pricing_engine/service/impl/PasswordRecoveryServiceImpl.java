@@ -1,9 +1,12 @@
-package com.aerodynamic.aerodynamic.pricing_engine.service;
+package com.aerodynamic.aerodynamic.pricing_engine.service.impl;
 
 import com.aerodynamic.aerodynamic.pricing_engine.model.PasswordResetCode;
 import com.aerodynamic.aerodynamic.pricing_engine.model.User;
 import com.aerodynamic.aerodynamic.pricing_engine.repository.PasswordResetCodeRepository;
 import com.aerodynamic.aerodynamic.pricing_engine.repository.UserRepository;
+import com.aerodynamic.aerodynamic.pricing_engine.service.EmailService;
+import com.aerodynamic.aerodynamic.pricing_engine.service.PasswordRecoveryService;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

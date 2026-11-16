@@ -1,4 +1,4 @@
-package com.aerodynamic.aerodynamic.pricing_engine.service;
+package com.aerodynamic.aerodynamic.pricing_engine.service.impl;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,6 +7,8 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+
+import com.aerodynamic.aerodynamic.pricing_engine.service.EmailService;
 
 @Service
 public class EmailServiceImpl implements EmailService {
