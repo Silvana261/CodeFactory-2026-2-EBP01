@@ -70,7 +70,7 @@ public class SecurityConfig {
             @Value("${cors.allowed-origins:http://localhost:8443}") String[] allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigins)); // Set allowed domains/frontends
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")); // Allowed HTTP methods
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // Allowed HTTP methods
         configuration.setAllowedHeaders(List.of("*")); // Allow all request headers
         configuration.setAllowCredentials(true); // Allow cookies/credentials if needed
 

@@ -33,6 +33,25 @@ export interface RegisterUserRequest {
   role: BackendRole
 }
 
+export interface MessageResponse {
+  message: string
+}
+
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface VerifyResetCodeRequest {
+  email: string
+  code: string
+}
+
+export interface ResetPasswordRequest {
+  email: string
+  code: string
+  newPassword: string
+}
+
 export type BusinessVariable = 'DEMAND' | 'AVAILABILITY' | 'TEMPORAL_CONTEXT'
 export type ConditionOperator =
   | 'GREATER_THAN_OR_EQUAL'
@@ -66,8 +85,19 @@ export interface PricingRuleResponse {
 
 export interface FlightRequest {
   idFlight: string
-  origin: string
-  destination: string
+  origin: City
+  destination: City
+  departureAt: string
+  basePrice: number
+  capacity: number
+  availability: number
+}
+
+export type City = 'BOG' | 'MDE' | 'CLO' | 'CTG' | 'BAQ'
+
+export interface FlightUpdateRequest {
+  origin: City
+  destination: City
   departureAt: string
   basePrice: number
   capacity: number
@@ -76,8 +106,8 @@ export interface FlightRequest {
 
 export interface FlightResponse {
   idFlight: string
-  origin: string
-  destination: string
+  origin: City
+  destination: City
   departureAt: string
   basePrice: number
   capacity: number
@@ -121,6 +151,95 @@ export interface PriceCalculationResponse {
   dynamicPrice: number
   adjustmentsApplied: boolean
   message: string
+}
+
+export interface PriceChangeSummaryResponse {
+  id: string
+  basePrice: number
+  dynamicPrice: number
+  changedAt: string
+}
+
+export interface PriceHistoryPageResponse {
+  flightId: string
+  content: PriceChangeSummaryResponse[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  message: string | null
+}
+
+export interface PriceEvolutionPoint {
+  changedAt: string
+  basePrice: number
+  dynamicPrice: number
+}
+
+export interface PriceEvolutionResponse {
+  flightId: string
+  chartAvailable: boolean
+  points: PriceEvolutionPoint[]
+  message: string | null
+}
+
+export interface PriceChangeRuleResponse {
+  ruleId: number
+  ruleName: string
+  adjustmentType: string
+  percentage: number
+  priceBefore: number
+  priceAfter: number
+}
+
+export interface PriceChangeResponse {
+  id: string
+  flightId: string
+  basePrice: number
+  dynamicPrice: number
+  changedAt: string
+  appliedRules: PriceChangeRuleResponse[]
+}
+
+export interface PricingReportResponse {
+  filters: {
+    flightId: string | null
+    from: string | null
+    to: string | null
+  }
+  hasData: boolean
+  message: string | null
+  indicators: {
+    flightsAnalyzed: number
+    priceChanges: number
+    averageVariationPercent: number
+  }
+  priceComparison: {
+    title: string
+    xAxisLabel: string
+    yAxisLabel: string
+    available: boolean
+    message: string | null
+    points: Array<{
+      date: string
+      averageBasePrice: number
+      averageDynamicPrice: number
+      changes: number
+    }>
+  }
+  variableImpact: {
+    title: string
+    xAxisLabel: string
+    yAxisLabel: string
+    available: boolean
+    message: string | null
+    items: Array<{
+      variable: string
+      rulesApplied: number
+      totalAdjustment: number
+      averageAdjustment: number
+    }>
+  }
 }
 
 export class ApiError extends Error {
@@ -209,6 +328,27 @@ export function loginRequest(payload: LoginRequest): Promise<LoginResponse> {
   })
 }
 
+export function forgotPasswordRequest(payload: ForgotPasswordRequest): Promise<MessageResponse> {
+  return request<MessageResponse>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function verifyResetCodeRequest(payload: VerifyResetCodeRequest): Promise<MessageResponse> {
+  return request<MessageResponse>('/api/auth/verify-reset-code', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function resetPasswordRequest(payload: ResetPasswordRequest): Promise<MessageResponse> {
+  return request<MessageResponse>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export function registerUserRequest(payload: RegisterUserRequest): Promise<UserResponse> {
   return request<UserResponse>('/api/users/register', {
     method: 'POST',
@@ -246,10 +386,102 @@ export function getAllFlightsRequest(): Promise<FlightResponse[]> {
   return request<FlightResponse[]>('/api/flights')
 }
 
+export function getFlightRequest(idFlight: string): Promise<FlightResponse> {
+  return request<FlightResponse>(`/api/flights/${encodeURIComponent(idFlight)}`)
+}
+
+export function updateFlightRequest(
+  idFlight: string,
+  payload: FlightUpdateRequest,
+): Promise<FlightResponse> {
+  return request<FlightResponse>(`/api/flights/${encodeURIComponent(idFlight)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updatePricingRuleRequest(
+  id: number,
+  payload: PricingRuleRequest,
+): Promise<PricingRuleResponse> {
+  return request<PricingRuleResponse>(`/api/pricing-rules/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updatePricingRuleStatusRequest(
+  id: number,
+  status: RuleStatus,
+): Promise<PricingRuleResponse> {
+  return request<PricingRuleResponse>(
+    `/api/pricing-rules/${id}/status?status=${status}`,
+    { method: 'PATCH' },
+  )
+}
+
 export function getFlightEvaluationRequest(flightId: string): Promise<FlightEvaluationResponse> {
   return request<FlightEvaluationResponse>(`/api/pricing-rules/evaluate/${flightId}`)
 }
 
 export function getDynamicPriceRequest(flightId: string): Promise<PriceCalculationResponse> {
   return request<PriceCalculationResponse>(`/api/flights/${flightId}/dynamic-price`)
+}
+
+export interface PriceHistoryRequestParams {
+  from?: string
+  to?: string
+  page?: number
+  size?: number
+}
+
+function buildQuery(params: {
+  from?: string
+  to?: string
+  page?: number
+  size?: number
+  flightId?: string
+}): string {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') query.set(key, String(value))
+  })
+  const serialized = query.toString()
+  return serialized ? `?${serialized}` : ''
+}
+
+export function getPriceHistoryRequest(
+  flightId: string,
+  params: PriceHistoryRequestParams = {},
+): Promise<PriceHistoryPageResponse> {
+  const query = buildQuery(params)
+  return request<PriceHistoryPageResponse>(
+    `/api/flights/${encodeURIComponent(flightId)}/price-history${query}`,
+  )
+}
+
+export function getPriceHistoryEvolutionRequest(
+  flightId: string,
+  params: Pick<PriceHistoryRequestParams, 'from' | 'to'> = {},
+): Promise<PriceEvolutionResponse> {
+  const query = buildQuery(params)
+  return request<PriceEvolutionResponse>(
+    `/api/flights/${encodeURIComponent(flightId)}/price-history/evolution${query}`,
+  )
+}
+
+export function getPriceChangeRequest(id: string): Promise<PriceChangeResponse> {
+  return request<PriceChangeResponse>(`/api/price-changes/${encodeURIComponent(id)}`)
+}
+
+export interface PricingReportRequestParams {
+  flightId?: string
+  from?: string
+  to?: string
+}
+
+export function getPricingReportRequest(
+  params: PricingReportRequestParams = {},
+): Promise<PricingReportResponse> {
+  return request<PricingReportResponse>(`/api/reports/pricing${buildQuery(params)}`)
 }
