@@ -55,6 +55,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/pricing-rules/**").hasRole("PRICING_ANALYST")
                 .requestMatchers("/api/flights/**").hasRole("PRICING_ANALYST")
+                .requestMatchers("/api/price-changes/**").hasRole("PRICING_ANALYST")
+                .requestMatchers("/api/reports/**").hasRole("PRICING_ANALYST")
                 .anyRequest().authenticated())
             // Insert our custom JWT filter before the standard username/password authentication filter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -68,7 +70,7 @@ public class SecurityConfig {
             @Value("${cors.allowed-origins:http://localhost:8443}") String[] allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigins)); // Set allowed domains/frontends
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")); // Allowed HTTP methods
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // Allowed HTTP methods
         configuration.setAllowedHeaders(List.of("*")); // Allow all request headers
         configuration.setAllowCredentials(true); // Allow cookies/credentials if needed
 

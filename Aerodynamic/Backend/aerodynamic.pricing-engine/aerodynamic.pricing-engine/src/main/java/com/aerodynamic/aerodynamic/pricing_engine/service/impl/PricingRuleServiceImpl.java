@@ -75,6 +75,49 @@ public class PricingRuleServiceImpl implements PricingRuleService {
     }
 
     /**
+     * Updates an existing pricing rule by its ID.
+     */
+@Override
+    public PricingRuleResponse updatePricingRule(Long idRule, PricingRuleRequest request) {
+        // 1. Find the existing rule in the database, or throw an exception if not found
+        PricingRule rule = pricingRuleRepository.findById(idRule)
+                .orElseThrow(() -> new RuntimeException("Pricing rule not found with id: " + idRule));
+
+        // 2. Update the rule's attributes with the new values from the request
+        rule.setRuleName(request.getRuleName());
+        rule.setBussinessVariable(request.getBussinessVariable());
+        rule.setCondition(request.getConditionOperator());
+        rule.setConditionValue(request.getConditionValue());
+        rule.setAdjustmentType(request.getAdjustmentType());
+        rule.setAdjustmentValue(request.getAdjustmentValue());
+
+        // 3. Save the updated rule changes to the database
+        PricingRule updatedRule = pricingRuleRepository.save(rule);
+
+        // 4. Convert the updated entity to a Response DTO and return it
+        return mapToResponse(updatedRule);
+    }
+
+    /**
+     * Updates only the status (ACTIVE/INACTIVE) of an existing pricing rule by its ID.
+     */
+    @Override
+    public PricingRuleResponse updateRuleStatus(Long idRule, StatusRule status) {
+        // 1. Find the existing rule in the database, or throw an exception if not found
+        PricingRule rule = pricingRuleRepository.findById(idRule)
+                .orElseThrow(() -> new RuntimeException("Pricing rule not found with id: " + idRule));
+
+        // 2. Update the status
+        rule.setStatus(status);
+
+        // 3. Save the changes to the database
+        PricingRule updatedRule = pricingRuleRepository.save(rule);
+
+        // 4. Convert to Response DTO and return it
+        return mapToResponse(updatedRule);
+    }
+
+    /**
      * Private helper method to centralize the Entity -> Response DTO conversion.
      */
     private PricingRuleResponse mapToResponse(PricingRule rule) {

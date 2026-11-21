@@ -47,7 +47,8 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
             current = applyAdjustment(current, rule);
             adjustments.add(new AppliedAdjustment(
                     rule.getIdRule(), rule.getRuleName(), rule.getAdjustmentType().name(),
-                    rule.getAdjustmentValue(), before.longValue(), current.longValue()));
+                    rule.getAdjustmentValue(), before.longValue(), current.longValue(),
+                    rule.getBussinessVariable().name()));
         }
 
         // Minimum fare is an internal floor: it is applied but never exposed to the client
