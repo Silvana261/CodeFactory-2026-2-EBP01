@@ -17,7 +17,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:}")
+    @Value("${app.mail.from:${spring.mail.username:}}")
     private String from;
 
     // DEVELOPMENT ONLY: prints the code in the console. Keep false in any shared environment.
